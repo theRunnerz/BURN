@@ -1,0 +1,6 @@
+{
+  "name": "TRON Wallet Autopsy",
+  "description": "Humorous AI crypto forensic analysis for TRON. Analyze wallet bags, calculate Degen & Rug Survival scores, play 0.25 TRX retro arcade games (Tron Man & X1roid), and chat in the community crypt.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-syne: 'Syne', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-cinzel: 'Cinzel', serif;
+  }
+
+  body {
+    background-color: #08080a;
+    color: #e4e4e7;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+.font-heading {
+  font-family: 'Syne', sans-serif;
+}
+
+.font-cinzel {
+  font-family: 'Cinzel', serif;
+}
+
+.font-mono-data {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle CRT Scanline overlay */
+.scanline-bg {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 4px, 6px 100%;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* EKG pulse keyframe */
+@keyframes ekgPulse {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-ekg {
+  stroke-dasharray: 1000;
+  animation: ekgPulse 3s linear infinite;
+}
+
+/* Red morgue glow */
+.morgue-glow-red {
+  box-shadow: 0 0 30px -10px rgba(239, 68, 68, 0.35);
+}
+
+.morgue-glow-toxic {
+  box-shadow: 0 0 30px -10px rgba(16, 185, 129, 0.3);
+}
+
+/* Coroner stamp */
+.coroner-stamp {
+  border: 3px dashed #ef4444;
+  color: #ef4444;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  transform: rotate(-8deg);
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  font-weight: 900;
+  font-family: 'Cinzel', serif;
+}
