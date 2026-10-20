@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ExternalLink, Rocket, ShieldCheck, Flame, Trophy, Coins, Gamepad2, Sparkles, Check, Copy } from 'lucide-react';
+import { ExternalLink, Rocket, ShieldCheck, Flame, Trophy, Coins, Gamepad2, Sparkles, Check, Copy, RefreshCw, Search } from 'lucide-react';
 
 interface FootballAlienPortalProps {
   onPlayExclusiveGame: () => void;
   fbaBalance: number;
   walletAddress: string | null;
   onConnectWallet: () => void;
+  onRefreshBalance?: (address?: string) => Promise<void> | void;
 }
 
 export const FBA_CONTRACT_ADDRESS = 'TNW5ABkp3v4jfeDo1vRVjxa3gtnoxP3DBN';
@@ -16,13 +17,41 @@ export const FootballAlienPortal: React.FC<FootballAlienPortalProps> = ({
   fbaBalance,
   walletAddress,
   onConnectWallet,
+  onRefreshBalance,
 }) => {
   const [copiedContract, setCopiedContract] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [manualAddress, setManualAddress] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
 
   const handleCopyContract = () => {
     navigator.clipboard.writeText(FBA_CONTRACT_ADDRESS);
     setCopiedContract(true);
     setTimeout(() => setCopiedContract(false), 2000);
+  };
+
+  const handleManualCheck = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualAddress.trim()) return;
+    setIsRefreshing(true);
+    try {
+      if (onRefreshBalance) {
+        await onRefreshBalance(manualAddress.trim());
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (onRefreshBalance) {
+        await onRefreshBalance(walletAddress || undefined);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const hasAccess = fbaBalance >= 1000;
@@ -115,10 +144,10 @@ export const FootballAlienPortal: React.FC<FootballAlienPortalProps> = ({
               </div>
               <span className={`px-2 py-1 rounded text-[10px] font-mono-data font-bold border ${
                 hasAccess
-                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse'
                   : 'bg-zinc-900 text-zinc-400 border-zinc-800'
               }`}>
-                {hasAccess ? 'ACCESS GRANTED' : 'LOCKED'}
+                {hasAccess ? '✓ VIP ACCESS GRANTED' : '🔒 1,000 $FBA REQUIRED'}
               </span>
             </div>
 
@@ -127,30 +156,85 @@ export const FootballAlienPortal: React.FC<FootballAlienPortalProps> = ({
               <div className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between">
                 <span className="text-zinc-400">Your Wallet:</span>
                 {walletAddress ? (
-                  <span className="text-emerald-400 font-bold">
-                    {walletAddress.slice(0, 5)}...{walletAddress.slice(-4)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-400 font-bold">
+                      {walletAddress.slice(0, 5)}...{walletAddress.slice(-4)}
+                    </span>
+                    <button
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      title="Refresh live on-chain balance"
+                      className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={onConnectWallet}
-                    className="text-amber-400 hover:underline font-bold"
+                    className="text-amber-400 hover:underline font-bold cursor-pointer"
                   >
                     Connect TronLink
                   </button>
                 )}
               </div>
 
-              <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-800/50 flex flex-col items-center justify-center text-center space-y-1">
-                <span className="text-[11px] text-zinc-400 uppercase">Your $FBA Token Holdings</span>
-                <span className="text-3xl font-black text-emerald-300 font-mono-data">
-                  {fbaBalance.toLocaleString()} <span className="text-sm font-normal text-zinc-400">$FBA</span>
+              <div className={`p-4 rounded-xl border flex flex-col items-center justify-center text-center space-y-1 transition-all ${
+                hasAccess 
+                  ? 'bg-emerald-950/40 border-emerald-600/70 shadow-[0_0_20px_rgba(16,185,129,0.15)]' 
+                  : 'bg-zinc-900/60 border-zinc-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-zinc-400 uppercase tracking-wider">Your $FBA Token Holdings</span>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="text-zinc-400 hover:text-emerald-400 transition-colors p-0.5"
+                    title="Check live on-chain balance"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+                  </button>
+                </div>
+                <span className="text-3xl font-black text-emerald-300 font-mono-data tracking-tight">
+                  {fbaBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-zinc-400">$FBA</span>
                 </span>
-                <span className="text-[10px] text-zinc-400">
+                <span className={`text-[10px] ${hasAccess ? 'text-emerald-400 font-bold' : 'text-zinc-400'}`}>
                   {hasAccess
-                    ? '🎉 You hold 1,000+ $FBA! Arcade is fully unlocked.'
+                    ? '👽 High-roller VIP status confirmed! Intergalactic Bowl unlocked.'
                     : `Need ${(1000 - fbaBalance).toLocaleString()} more $FBA to play Alien Blitz.`}
                 </span>
               </div>
+
+              {/* Manual Address Lookup Toggle (if wallet not connected or checking another address) */}
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowManualInput(!showManualInput)}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 underline font-mono-data"
+                >
+                  {showManualInput ? 'Hide address lookup' : 'Check balance by TRON address'}
+                </button>
+              </div>
+
+              {showManualInput && (
+                <form onSubmit={handleManualCheck} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={manualAddress}
+                    onChange={(e) => setManualAddress(e.target.value)}
+                    placeholder="Enter TRON address (T...)"
+                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 font-mono-data focus:border-emerald-500 outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isRefreshing}
+                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold font-mono-data transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Search className="w-3 h-3" />
+                    <span>Check</span>
+                  </button>
+                </form>
+              )}
             </div>
 
             {/* Contract Address Section */}

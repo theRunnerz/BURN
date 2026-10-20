@@ -20,7 +20,7 @@ import { ChainConfigModal } from './components/ChainConfigModal.js';
 import { FootballAlienPortal, FBA_CONTRACT_ADDRESS } from './components/FootballAlienPortal.js';
 import { AutopsyReport, ChainConfig } from './types.js';
 import { analyzeWallet, fetchChainConfig, verifyBurnTransaction } from './services/api.js';
-import { connectTronWallet } from './services/tronWallet.js';
+import { connectTronWallet, fetchFbaBalance } from './services/tronWallet.js';
 import { Activity, AlertTriangle, Skull } from 'lucide-react';
 
 export default function App() {
@@ -51,26 +51,11 @@ export default function App() {
   const [isBurnModalOpen, setIsBurnModalOpen] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  // Helper to query wallet for $FBA TRC-20 balance via TronWeb or API
+  // Helper to query wallet for $FBA TRC-20 balance via multi-strategy on-chain check
   const checkFbaBalance = async (address: string) => {
     try {
-      if (typeof window !== 'undefined' && window.tronWeb && window.tronWeb.ready) {
-        try {
-          const contract = await window.tronWeb.contract().at(FBA_CONTRACT_ADDRESS);
-          const rawBal = await contract.balanceOf(address).call();
-          const parsed = parseFloat(rawBal.toString()) / 1e6;
-          setFbaBalance(isNaN(parsed) ? 0 : parsed);
-          return;
-        } catch {
-          // If contract call fails (e.g. non-mainnet or custom decimals), fallback
-        }
-      }
-      // Demo fallback check based on demo address
-      if (address === 'TLyqzVGLV1srkB7dToTAnY929auPU2oYt6') {
-        setFbaBalance(250000);
-      } else if (address === 'TXd3Ge5kX81cE4f7Y6n1M2s9Lk7P2Q5bZa') {
-        setFbaBalance(1500);
-      }
+      const bal = await fetchFbaBalance(address);
+      setFbaBalance(bal);
     } catch (err) {
       console.warn('FBA balance check notice:', err);
     }
@@ -199,6 +184,10 @@ export default function App() {
             fbaBalance={fbaBalance}
             walletAddress={walletAddress}
             onConnectWallet={handleConnectWallet}
+            onRefreshBalance={async (customAddr) => {
+              const target = customAddr || walletAddress;
+              if (target) await checkFbaBalance(target);
+            }}
           />
         )}
 

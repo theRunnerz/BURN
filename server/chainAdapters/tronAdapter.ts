@@ -174,16 +174,19 @@ export class TronAdapter implements ChainAdapter {
               const contractAddr = Object.keys(item)[0];
               const rawBal = item[contractAddr];
               if (contractAddr && rawBal) {
-                const bal = parseFloat(rawBal) / 1e6; // default 6 decimals
+                const isFba = contractAddr === 'TNW5ABkp3v4jfeDo1vRVjxa3gtnoxP3DBN';
+                const isUsdt = contractAddr === 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+                const decimals = isFba ? 18 : isUsdt ? 6 : 6;
+                const bal = parseFloat(rawBal) / Math.pow(10, decimals);
                 tokens.push({
-                  symbol: contractAddr.slice(0, 6).toUpperCase(),
-                  name: `TRC20 Token (${contractAddr.slice(-4)})`,
+                  symbol: isFba ? 'FBALIEN$' : isUsdt ? 'USDT' : contractAddr.slice(0, 6).toUpperCase(),
+                  name: isFba ? 'FootballAlien$' : isUsdt ? 'Tether USD' : `TRC20 Token (${contractAddr.slice(-4)})`,
                   balance: bal,
-                  decimals: 6,
+                  decimals,
                   contractAddress: contractAddr,
-                  usdValueEstimate: parseFloat((bal * 0.05).toFixed(2)),
+                  usdValueEstimate: parseFloat((bal * (isFba ? 0.0001 : isUsdt ? 1.0 : 0.05)).toFixed(2)),
                   percentageOfPortfolio: 0,
-                  isMemeToken: true
+                  isMemeToken: isFba ? true : !isUsdt
                 });
               }
             }
