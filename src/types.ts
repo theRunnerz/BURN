@@ -1,124 +1,124 @@
-export interface AutopsyReport {
+export interface TokenHolding {
+  symbol: string;
+  name: string;
+  balance: number;
+  decimals: number;
+  contractAddress?: string;
+  usdValueEstimate?: number;
+  percentageOfPortfolio: number;
+  isMemeToken?: boolean;
+}
+
+export interface WalletData {
   address: string;
-  timestamp: string;
-  riskScore: number; // 0-100 (100 = completely dead/rekt)
-  status: 'SURVIVING' | 'TERMINAL' | 'BRAIN_DEAD' | 'FLATLINED' | 'BLESSED';
-  summary: string;
-  primaryCauseOfDeath: string;
-  pathologyFindings: PathologyFinding[];
-  financialVitals: FinancialVitals;
-  degenSins: DegenSin[];
-  eulogy: string;
-  survivalTips: string[];
-  shareableSlug?: string;
+  trxBalance: number;
+  trxUsdValue: number;
+  totalUsdEstimate: number;
+  tokens: TokenHolding[];
+  transactionCount: number;
+  walletAgeDays: number;
+  firstSeenTimestamp: number;
+  lastActiveTimestamp: number;
+  largestIncomingTx?: { amount: number; symbol: string; date: string; hash: string };
+  largestOutgoingTx?: { amount: number; symbol: string; date: string; hash: string };
+  frequentTokens: string[];
+  defiInteractionsCount: number;
+  isContract: boolean;
+  sampleWalletType?: 'whale' | 'rug_victim' | 'hodler' | 'newbie';
 }
 
 export interface PathologyFinding {
-  system: 'LIQUIDITY' | 'SMART_CONTRACT' | 'PORTFOLIO_DIVERSITY' | 'LEVERAGE' | 'RUG_EXPOSURE';
-  severity: 'MILD' | 'MODERATE' | 'SEVERE' | 'CRITICAL';
-  finding: string;
+  condition: string;
+  severity: 'MILD' | 'SEVERE' | 'TERMINAL';
   description: string;
 }
 
-export interface FinancialVitals {
-  trxBalance: number;
-  totalTokensTracked: number;
-  totalLossEstimatedUsd: number;
-  totalGasSpentUsd: number;
-  deadTokensCount: number;
-  winRate: number; // percentage
-  worstRugName: string;
-  worstRugLossUsd: number;
+export interface AutopsyScores {
+  degenScore: number;
+  diamondHandsScore: number;
+  financialIq: number;
+  rugSurvivalScore: number;
+  diversificationScore: number;
 }
 
-export interface DegenSin {
-  sinName: string;
-  punishment: string;
-  severity: 'MINOR' | 'MORTAL' | 'UNFORGIVABLE';
+export interface AutopsyReport {
+  id: string;
+  address: string;
+  createdAt: number;
+  walletData: WalletData;
+  scores: AutopsyScores;
+  causeOfDeath: string;
+  doctorsDiagnosis: string;
+  coronersNote: string;
+  pathologyFindings: PathologyFinding[];
+  longestHeldBaggage: string;
+  toxicHolding: string;
+  rxPrescription: string;
+  toxicQuote: string;
+  unlocked: boolean;
+  burnTxHash?: string;
+  burnTokenSymbol?: string;
+  burnAmount?: number;
+  burnAddress?: string;
 }
 
-export interface BurnCertificate {
-  certificateId: string;
-  timestamp: string;
-  deadTokenAddress: string;
-  deadTokenSymbol: string;
-  deadTokenAmount: number;
-  walletAddress: string;
-  ashesReceived: number; // $ASHES governance token
-  txHash: string;
-  epitaph: string;
-  sinRepented: string;
-  burnCountTotal?: number;
+export interface ChainConfig {
+  chainId: string;
+  chainName: string;
+  currencySymbol: string;
+  burnTokenSymbol: string;
+  burnTokenName: string;
+  burnTokenContract: string;
+  burnAddress: string;
+  requiredBurnAmount: number;
+  explorerBaseUrl: string;
+  isTestnet: boolean;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  address: string;
+  degenScore: number;
+  causeOfDeath: string;
+  unlocked: boolean;
+  burnTxHash?: string;
+  timestamp: number;
 }
 
 export interface DeathOracleResult {
-  deathDate: string;
-  deathCause: string;
-  finalWords: string;
-  graveyardTombstone: string;
-  predictedLossUsd: number;
-  survivalOdds: number;
-  dangerToken: string;
-  oraclePoem: string;
+  predictedDateOfDeath: string;
+  daysRemaining: number;
+  mannerOfDeath: string;
+  cryptKeeperEpitaph: string;
+  spookyCurse: string;
+  hauntingSpirit: string;
+  survivalTalisman: string;
+  fearScore: number;
 }
 
-export interface HallOfDeadItem {
+export interface ChatMessage {
   id: string;
-  timestamp: string;
-  tokenSymbol: string;
-  tokenName: string;
-  burntAmount: number;
-  estimatedLostUsd: number;
-  epitaph: string;
-  walletShort: string;
-  ashesMinted: number;
+  sender: string;
+  walletAddress?: string;
+  text: string;
+  autopsyCard?: {
+    degenScore: number;
+    causeOfDeath: string;
+  };
+  timestamp: number;
+  badge?: 'DEGEN' | 'WHALE' | 'CHAMPION' | 'CORONER';
 }
 
-export interface BurnLeaderboardEntry {
-  rank: number;
-  wallet: string;
-  ashesBalance: number;
-  tokensBurntCount: number;
-  totalUsdMemorialized: number;
-  epitaph: string;
-}
-
-export interface CommunityMemorial {
-  id: string;
-  tokenSymbol: string;
-  tokenName: string;
-  rugYear: number;
-  deathCause: string;
-  totalCandlesLit: number;
-  ripCount: number;
-  eulogy: string;
-  creator: string;
-  timestamp: string;
-}
-
-// Tron Arcade Types
 export interface ArcadeScore {
   id: string;
-  player: string;
-  score: number;
   game: 'tron-man' | 'x1-roid' | 'football-alien';
-  timestamp: string;
-  walletAddress?: string;
+  player: string;
+  walletAddress: string;
+  score: number;
+  timestamp: number;
 }
 
 export interface ArcadeConfig {
-  feeTrx: number;
   revenueAddress: string;
-  demoCredits: number;
-}
-
-// Cemetery Chat Types
-export interface ChatMessage {
-  id: string;
-  player: string;
-  walletAddress: string;
-  message: string;
-  avatarSeed: string;
-  rankBadge: string;
-  timestamp: string;
+  coinPriceTrx: number;
 }

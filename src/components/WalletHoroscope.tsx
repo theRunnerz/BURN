@@ -66,7 +66,7 @@ export const WalletHoroscope: React.FC<WalletHoroscopeProps> = ({
   const handleShareHoroscope = () => {
     const text = `🔮 My TRON Wallet Horoscope (${activeSignData.name} ${activeSignData.symbol}):\n` +
       `Archetype: "${activeSignData.cryptoArchetype}"\n\n` +
-      `Read your wallet's celestial crypto prophecy at tronwalletautopsy.com #TRON #CryptoHoroscope`;
+      `Read your wallet's celestial crypto prophecy at thefootballalien.store #TRON #CryptoHoroscope`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 

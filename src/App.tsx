@@ -1,266 +1,358 @@
-import React, { useState } from 'react';
-import { Header } from './components/Header';
-import { AutopsyCard } from './components/AutopsyCard';
-import { DeadTokenList } from './components/DeadTokenList';
-import { BurnCertificateModal } from './components/BurnCertificateModal';
-import { HallOfTheDead } from './components/HallOfTheDead';
-import { BurnLeaderboard } from './components/BurnLeaderboard';
-import { MemorialCandles } from './components/MemorialCandles';
-import { DeathOracle } from './components/DeathOracle';
-import { ArcadeCabinet } from './components/arcade/ArcadeCabinet';
-import { CemeteryChat } from './components/CemeteryChat';
-import { FootballAlienPortal } from './components/FootballAlienPortal';
-import { AutopsyReport, BurnCertificate } from './types';
-import { fetchAutopsyReport } from './services/api';
-import { Skull, AlertTriangle, ShieldAlert } from 'lucide-react';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-export function App() {
+import React, { useEffect, useState } from 'react';
+import { Header } from './components/Header.js';
+import { AutopsySearch } from './components/AutopsySearch.js';
+import { FreePreviewTeaser } from './components/FreePreviewTeaser.js';
+import { UnlockedFullAutopsy } from './components/UnlockedFullAutopsy.js';
+import { BurnPaymentModal } from './components/BurnPaymentModal.js';
+import { PortfolioFuneral } from './components/PortfolioFuneral.js';
+import { WalletHoroscope } from './components/WalletHoroscope.js';
+import { RugDetector } from './components/RugDetector.js';
+import { DegenLeaderboard } from './components/DegenLeaderboard.js';
+import { DeathOracle } from './components/DeathOracle.js';
+import { ArcadeCabinet } from './components/arcade/ArcadeCabinet.js';
+import { CryptoChatRoom } from './components/chat/CryptoChatRoom.js';
+import { ChainConfigModal } from './components/ChainConfigModal.js';
+import { FootballAlienPortal, FBA_CONTRACT_ADDRESS } from './components/FootballAlienPortal.js';
+import { AutopsyReport, ChainConfig } from './types.js';
+import { analyzeWallet, fetchChainConfig, verifyBurnTransaction } from './services/api.js';
+import { connectTronWallet } from './services/tronWallet.js';
+import { Activity, AlertTriangle, Skull } from 'lucide-react';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'alien' | 'autopsy' | 'funeral' | 'horoscope' | 'rugs' | 'leaderboard' | 'oracle' | 'arcade' | 'chat' | 'config'>('alien');
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'autopsy' | 'burn' | 'hall' | 'leaderboard' | 'memorials' | 'oracle' | 'arcade' | 'chat' | 'football-alien'>('football-alien');
-  const [autopsyReport, setAutopsyReport] = useState<AutopsyReport | null>(null);
-  const [isLoadingAutopsy, setIsLoadingAutopsy] = useState<boolean>(false);
-  const [autopsyError, setAutopsyError] = useState<string | null>(null);
-  const [searchAddress, setSearchAddress] = useState<string>('');
-  const [latestCertificate, setLatestCertificate] = useState<BurnCertificate | null>(null);
-  const [ashesBalance, setAshesBalance] = useState<number>(1420);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isTronLinkInstalled, setIsTronLinkInstalled] = useState(false);
+  const [fbaBalance, setFbaBalance] = useState<number>(0);
 
-  // Connect mock / real TronLink wallet
-  const handleConnectWallet = async () => {
-    if ((window as any).tronWeb && (window as any).tronWeb.defaultAddress) {
-      const addr = (window as any).tronWeb.defaultAddress.base58;
-      if (addr) {
-        setWalletAddress(addr);
-        setSearchAddress(addr);
-        runAutopsy(addr);
-        return;
-      }
-    }
-    // Fallback demo address
-    const demoAddr = 'TD3z7mNq8yP1vX0K4wL9uR5bS2aC8eJ1hG';
-    setWalletAddress(demoAddr);
-    setSearchAddress(demoAddr);
-    runAutopsy(demoAddr);
-  };
+  const [chainConfig, setChainConfig] = useState<ChainConfig>({
+    chainId: 'tron-mainnet',
+    chainName: 'TRON Mainnet',
+    currencySymbol: 'TRX',
+    burnTokenSymbol: 'AUTOPSY',
+    burnTokenName: 'Autopsy Meme Token',
+    burnTokenContract: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    burnAddress: 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb',
+    requiredBurnAmount: 10000,
+    explorerBaseUrl: 'https://tronscan.org/#/transaction/',
+    isTestnet: false,
+  });
+  const [availableChains, setAvailableChains] = useState<Array<{ id: string; name: string; active: boolean }>>([]);
+  const [activeChain, setActiveChain] = useState('tron');
 
-  const runAutopsy = async (addressToScan: string) => {
-    if (!addressToScan.trim()) return;
+  const [currentReport, setCurrentReport] = useState<AutopsyReport | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('Reading public TRON ledger...');
+  const [isBurnModalOpen, setIsBurnModalOpen] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  // Helper to query wallet for $FBA TRC-20 balance via TronWeb or API
+  const checkFbaBalance = async (address: string) => {
     try {
-      setIsLoadingAutopsy(true);
-      setAutopsyError(null);
-      const report = await fetchAutopsyReport(addressToScan.trim());
-      setAutopsyReport(report);
-    } catch (err: any) {
-      setAutopsyError(err.message || 'Failed to complete autopsy');
-    } finally {
-      setIsLoadingAutopsy(false);
+      if (typeof window !== 'undefined' && window.tronWeb && window.tronWeb.ready) {
+        try {
+          const contract = await window.tronWeb.contract().at(FBA_CONTRACT_ADDRESS);
+          const rawBal = await contract.balanceOf(address).call();
+          const parsed = parseFloat(rawBal.toString()) / 1e6;
+          setFbaBalance(isNaN(parsed) ? 0 : parsed);
+          return;
+        } catch {
+          // If contract call fails (e.g. non-mainnet or custom decimals), fallback
+        }
+      }
+      // Demo fallback check based on demo address
+      if (address === 'TLyqzVGLV1srkB7dToTAnY929auPU2oYt6') {
+        setFbaBalance(250000);
+      } else if (address === 'TXd3Ge5kX81cE4f7Y6n1M2s9Lk7P2Q5bZa') {
+        setFbaBalance(1500);
+      }
+    } catch (err) {
+      console.warn('FBA balance check notice:', err);
     }
   };
 
-  const handleBurnSuccess = (certificate: BurnCertificate) => {
-    setLatestCertificate(certificate);
-    setAshesBalance(prev => prev + certificate.ashesReceived);
+  // Initialize chain config & detect TronLink on load
+  useEffect(() => {
+    fetchChainConfig()
+      .then((data) => {
+        setChainConfig(data.config);
+        setActiveChain(data.activeChain);
+        setAvailableChains(data.availableChains);
+      })
+      .catch((err) => console.warn('Config fetch notice:', err));
+
+    // Check if TronLink is already connected
+    if (typeof window !== 'undefined' && window.tronWeb && window.tronWeb.defaultAddress?.base58) {
+      const addr = window.tronWeb.defaultAddress.base58;
+      setWalletAddress(addr);
+      setIsTronLinkInstalled(true);
+      checkFbaBalance(addr);
+    }
+  }, []);
+
+  const handleConnectWallet = async () => {
+    setIsConnecting(true);
+    setGlobalError(null);
+    try {
+      const res = await connectTronWallet();
+      setIsTronLinkInstalled(res.isTronLinkInstalled);
+      if (res.connected && res.address) {
+        setWalletAddress(res.address);
+        checkFbaBalance(res.address);
+      } else if (res.error) {
+        setGlobalError(res.error);
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    setWalletAddress(null);
+    setFbaBalance(0);
+  };
+
+  const handleAnalyzeAddress = async (address: string) => {
+    setIsLoading(true);
+    setGlobalError(null);
+    setCurrentReport(null);
+    setActiveTab('autopsy');
+
+    const steps = [
+      'Scanning public TRON blockchain records...',
+      'Counting necrotic meme bags and unliquidated tokens...',
+      'Examining SunPump scar tissue & DEX transactions...',
+      'Consulting Chief Forensic Pathologist with Gemini...',
+      'Calculating Degen and Rug Survival indexes...',
+    ];
+
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      stepIdx = (stepIdx + 1) % steps.length;
+      setLoadingStep(steps[stepIdx]);
+    }, 1200);
+
+    try {
+      const res = await analyzeWallet(address);
+      setCurrentReport(res.report);
+      setChainConfig(res.activeChainConfig);
+    } catch (err: any) {
+      setGlobalError(err.message || 'Failed to examine wallet address.');
+    } finally {
+      clearInterval(interval);
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyBurn = async (txHash: string, burnAmount = 0.25, burnTokenSymbol = 'TRX') => {
+    if (!currentReport) return;
+    try {
+      const res = await verifyBurnTransaction(currentReport.id, txHash, walletAddress || currentReport.address, burnAmount, burnTokenSymbol);
+      if (res.success && res.report) {
+        setCurrentReport(res.report);
+      }
+    } catch (err: any) {
+      setGlobalError(err.message || 'Failed to verify transaction on ledger.');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#070709] text-zinc-100 flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      {/* Top Navigation */}
+    <div className="min-h-screen flex flex-col bg-[#08080a] text-zinc-100 scanline-bg">
+      {/* Top Header */}
       <Header
-        walletAddress={walletAddress}
-        onConnectWallet={handleConnectWallet}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        ashesBalance={ashesBalance}
+        walletAddress={walletAddress}
+        onConnectWallet={handleConnectWallet}
+        onDisconnectWallet={handleDisconnectWallet}
+        isConnecting={isConnecting}
+        chainName={chainConfig.chainName}
+        isTronLinkInstalled={isTronLinkInstalled}
       />
 
-      {/* Main App Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab 0: Football Alien Portal */}
-        {activeTab === 'football-alien' && (
+      {/* Global Alert */}
+      {globalError && (
+        <div className="max-w-4xl mx-auto px-4 mt-4 w-full">
+          <div className="p-3 bg-rose-950/70 border border-rose-900 rounded-lg flex items-center justify-between text-xs text-rose-300 font-mono-data">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{globalError}</span>
+            </div>
+            <button onClick={() => setGlobalError(null)} className="text-zinc-400 hover:text-white font-sans">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main App Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
+        {/* Tab 0: Football Alien$ Portal (Before Autopsy) */}
+        {activeTab === 'alien' && (
           <FootballAlienPortal
+            onPlayExclusiveGame={() => setActiveTab('arcade')}
+            fbaBalance={fbaBalance}
             walletAddress={walletAddress}
-            onLaunchGame={() => setActiveTab('arcade')}
+            onConnectWallet={handleConnectWallet}
           />
         )}
 
-        {/* Tab 1: Autopsy Scanner */}
+        {/* Tab 1: Autopsy */}
         {activeTab === 'autopsy' && (
-          <div className="space-y-8">
-            {/* Search / Scan Hero Header */}
-            <div className="text-center max-w-3xl mx-auto space-y-4">
-              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-red-950/40 border border-red-800/40 text-red-400 text-xs font-mono">
-                <Skull className="w-3.5 h-3.5 text-red-500" />
-                <span>POST-MORTEM BLOCKCHAIN PATHOLOGY</span>
-              </div>
-              <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white">
-                TRON WALLET <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-500 to-amber-500">AUTOPSY</span>
-              </h1>
-              <p className="text-zinc-400 font-mono text-sm sm:text-base">
-                Paste any TRON address to detect dead SunPump tokens, calculate total dollar loss, and receive a diagnosis from the Chief Blockchain Mortician.
-              </p>
-
-              {/* Input Form */}
-              <div className="pt-4 max-w-2xl mx-auto">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    runAutopsy(searchAddress);
-                  }}
-                  className="flex flex-col sm:flex-row gap-2"
-                >
-                  <input
-                    type="text"
-                    value={searchAddress}
-                    onChange={(e) => setSearchAddress(e.target.value)}
-                    placeholder="Enter TRON wallet (e.g. TD3z... or TJ9X...)"
-                    className="flex-1 px-4 py-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-white font-mono text-sm placeholder-zinc-500 focus:outline-none focus:border-red-500/80 transition-all shadow-inner"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isLoadingAutopsy}
-                    className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold font-mono text-xs tracking-wider uppercase transition-all shadow-lg shadow-red-950/40 disabled:opacity-50"
-                  >
-                    {isLoadingAutopsy ? 'Examining Corpse...' : 'Perform Autopsy'}
-                  </button>
-                </form>
-
-                {/* Sample quick buttons */}
-                <div className="flex items-center justify-center space-x-2 pt-3 text-xs font-mono text-zinc-500">
-                  <span>Quick inspect:</span>
-                  <button
-                    onClick={() => {
-                      const ex = 'TD3z7mNq8yP1vX0K4wL9uR5bS2aC8eJ1hG';
-                      setSearchAddress(ex);
-                      runAutopsy(ex);
-                    }}
-                    className="text-zinc-400 hover:text-red-400 underline decoration-dashed"
-                  >
-                    Degen Victim (4 rugs)
-                  </button>
-                  <span>•</span>
-                  <button
-                    onClick={() => {
-                      const ex = 'TJ9X4kL9yP2vX0K7wM3uR8bS1aC9eJ4hB';
-                      setSearchAddress(ex);
-                      runAutopsy(ex);
-                    }}
-                    className="text-zinc-400 hover:text-red-400 underline decoration-dashed"
-                  >
-                    SunPump Survivor (14 rugs)
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {autopsyError && (
-              <div className="max-w-xl mx-auto p-4 rounded-xl bg-red-950/40 border border-red-800/60 text-red-300 text-xs font-mono flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{autopsyError}</span>
-              </div>
-            )}
-
-            {/* Loading Indicator */}
-            {isLoadingAutopsy && (
-              <div className="py-16 text-center space-y-4">
-                <div className="inline-block w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
-                <p className="font-mono text-sm text-zinc-400">Consulting coroner records and scanning TRON memepools...</p>
-              </div>
-            )}
-
-            {/* Autopsy Result Report */}
-            {autopsyReport && !isLoadingAutopsy && (
-              <div className="space-y-6">
-                <AutopsyCard report={autopsyReport} />
-                
-                {/* Direct Action Link to Incinerate */}
-                <div className="p-6 rounded-2xl border border-orange-500/30 bg-gradient-to-r from-orange-950/20 via-zinc-950 to-zinc-950 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1 text-center sm:text-left">
-                    <h4 className="font-bold text-white text-base">Ready to cleanse this wallet?</h4>
-                    <p className="text-xs text-zinc-400 font-mono">
-                      Send {autopsyReport.financialVitals.deadTokensCount} dead token contracts to the crematorium and mint proof-of-burn $ASHES.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('burn')}
-                    className="px-6 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-black font-bold font-mono text-xs uppercase tracking-wider transition-all shadow-md shadow-orange-950/50"
-                  >
-                    Open Crematorium →
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 2: Incinerator & Token Burning */}
-        {activeTab === 'burn' && (
-          <div className="space-y-8">
-            <DeadTokenList
-              walletAddress={walletAddress}
-              onConnectWallet={handleConnectWallet}
-              onBurnSuccess={handleBurnSuccess}
+          <div className="space-y-10">
+            {/* Search and Address Ingestion */}
+            <AutopsySearch
+              onAnalyze={handleAnalyzeAddress}
+              isLoading={isLoading}
+              connectedWallet={walletAddress}
+              onDisconnect={handleDisconnectWallet}
             />
+
+            {/* Loading Inspection Animation */}
+            {isLoading && (
+              <div className="w-full max-w-xl mx-auto bg-zinc-900/90 border border-rose-900/40 rounded-xl p-8 text-center space-y-4 morgue-glow-red animate-pulse">
+                <div className="w-14 h-14 mx-auto rounded-full bg-rose-950 border border-rose-600/60 flex items-center justify-center text-rose-500">
+                  <Skull className="w-7 h-7 animate-bounce" />
+                </div>
+                <h3 className="font-heading font-black text-xl text-white tracking-wider uppercase">
+                  Performing Surgical Autopsy
+                </h3>
+                <p className="text-xs font-mono-data text-rose-400">
+                  {loadingStep}
+                </p>
+                <div className="w-48 mx-auto h-1.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
+                  <div className="h-full bg-rose-600 animate-indeterminate rounded-full" />
+                </div>
+              </div>
+            )}
+
+            {/* Report Display */}
+            {!isLoading && currentReport && (
+              <>
+                {!currentReport.unlocked ? (
+                  <FreePreviewTeaser
+                    report={currentReport}
+                    chainConfig={chainConfig}
+                    onOpenBurnModal={() => setIsBurnModalOpen(true)}
+                  />
+                ) : (
+                  <UnlockedFullAutopsy
+                    report={currentReport}
+                    chainConfig={chainConfig}
+                  />
+                )}
+              </>
+            )}
           </div>
         )}
 
-        {/* Tab 3: Arcade Cabinet */}
+        {/* Tab 2: Portfolio Funeral */}
+        {activeTab === 'funeral' && (
+          <PortfolioFuneral
+            currentAddress={currentReport?.address || walletAddress || undefined}
+            chainBurnAddress={chainConfig.burnAddress}
+          />
+        )}
+
+        {/* Tab 3: Horoscope */}
+        {activeTab === 'horoscope' && (
+          <WalletHoroscope
+            currentAddress={currentReport?.address || walletAddress || undefined}
+            degenScore={currentReport?.scores.degenScore || 85}
+          />
+        )}
+
+        {/* Tab 4: Rug Detector */}
+        {activeTab === 'rugs' && (
+          <RugDetector
+            walletData={currentReport?.walletData}
+            onScanAddress={handleAnalyzeAddress}
+          />
+        )}
+
+        {/* Tab 5: Degen Leaderboard */}
+        {activeTab === 'leaderboard' && (
+          <DegenLeaderboard onSelectAddress={handleAnalyzeAddress} />
+        )}
+
+        {/* Tab 6: Spooky Halloween Death Oracle */}
+        {activeTab === 'oracle' && (
+          <DeathOracle
+            currentAddress={currentReport?.address || walletAddress || undefined}
+            degenScore={currentReport?.scores.degenScore || 88}
+          />
+        )}
+
+        {/* Tab 7: Retro Arcade (Alien Blitz, Tron Man & X1roid) */}
         {activeTab === 'arcade' && (
           <ArcadeCabinet
             walletAddress={walletAddress}
+            onOpenChat={() => setActiveTab('chat')}
+            fbaBalance={fbaBalance}
+            initialGame="football-alien"
             onConnectWallet={handleConnectWallet}
-            defaultGame="football-alien"
           />
         )}
 
-        {/* Tab 4: Cemetery Chat */}
+        {/* Tab 8: Degen Crypt & Morgue Chat */}
         {activeTab === 'chat' && (
-          <CemeteryChat
+          <CryptoChatRoom
             walletAddress={walletAddress}
-            onConnectWallet={handleConnectWallet}
+            currentReport={currentReport}
+            onSelectAddress={handleAnalyzeAddress}
+            onOpenArcade={() => setActiveTab('arcade')}
           />
         )}
 
-        {/* Tab 5: Hall of the Dead */}
-        {activeTab === 'hall' && <HallOfTheDead />}
-
-        {/* Tab 6: Burn Leaderboard */}
-        {activeTab === 'leaderboard' && <BurnLeaderboard />}
-
-        {/* Tab 7: Community Memorials */}
-        {activeTab === 'memorials' && <MemorialCandles walletAddress={walletAddress} />}
-
-        {/* Tab 8: Death Oracle */}
-        {activeTab === 'oracle' && (
-          <DeathOracle
-            walletAddress={walletAddress}
-            onConnectWallet={handleConnectWallet}
+        {/* Tab 9: Chain & Burn Config */}
+        {activeTab === 'config' && (
+          <ChainConfigModal
+            currentChain={activeChain}
+            chainConfig={chainConfig}
+            availableChains={availableChains}
+            onConfigUpdated={(newCfg, chainId) => {
+              setChainConfig(newCfg);
+              setActiveChain(chainId);
+            }}
           />
         )}
       </main>
 
-      {/* Burn Certificate Modal */}
-      {latestCertificate && (
-        <BurnCertificateModal
-          certificate={latestCertificate}
-          onClose={() => setLatestCertificate(null)}
+      {/* Burn Payment Modal */}
+      {currentReport && (
+        <BurnPaymentModal
+          isOpen={isBurnModalOpen}
+          onClose={() => setIsBurnModalOpen(false)}
+          autopsyId={currentReport.id}
+          walletAddress={walletAddress || currentReport.address}
+          chainConfig={chainConfig}
+          onBurnVerified={handleVerifyBurn}
         />
       )}
 
       {/* Footer */}
-      <footer className="border-t border-zinc-900 bg-zinc-950/60 py-8 mt-16 font-mono text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <div className="space-y-1">
-            <p className="text-zinc-400">TRON Autopsy & Dead Token Furnace 💀🔥</p>
-            <p className="text-[11px] text-zinc-600">
-              Not financial advice. Meme tokens carry high risk. Memorialize your fallen bags and game in peace.
-            </p>
+      <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-xs text-zinc-400 font-mono-data">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-zinc-300 font-bold">TRON WALLET AUTOPSY</span>
+            <span aria-hidden="true">·</span>
+            <span>All burns verified on TRON public ledger</span>
           </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-red-400 font-semibold">TRON NETWORK</span>
-            <span>•</span>
-            <span className="text-emerald-400 font-semibold">$FBA VERIFIED</span>
-            <span>•</span>
-            <span className="text-orange-400 font-semibold">$ASHES MINTING ACTIVE</span>
+
+          <div className="flex items-center gap-4 text-[11px] text-zinc-400 flex-wrap justify-center sm:justify-end">
+            <span>Read-only & Non-custodial</span>
+            <span aria-hidden="true">·</span>
+            <span>Target Burn: {chainConfig.burnAddress.slice(0, 6)}...{chainConfig.burnAddress.slice(-4)}</span>
+            <span aria-hidden="true">·</span>
+            <span>Arcade Revenue: TENXRk...HygP</span>
+            <span aria-hidden="true">·</span>
+            <span>Swappable for X1</span>
           </div>
         </div>
       </footer>

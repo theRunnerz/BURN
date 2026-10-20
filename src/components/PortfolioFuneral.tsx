@@ -100,7 +100,7 @@ export const PortfolioFuneral: React.FC<PortfolioFuneralProps> = ({
     const text = `🪦 Rest In Peace:\n${[token1, token2, token3].filter(Boolean).join(', ')}\n\n` +
       `Buried with official crypto rites via TRON Wallet Autopsy.\n` +
       `"Here lies hope. May their liquidity rest in peace."\n\n` +
-      `tronwalletautopsy.com #TRON #BagFuneral #CryptoHalloween`;
+      `thefootballalien.store #TRON #BagFuneral #CryptoHalloween`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 

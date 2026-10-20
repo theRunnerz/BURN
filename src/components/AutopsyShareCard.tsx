@@ -68,486 +68,497 @@ export const AutopsyShareCard: React.FC<AutopsyShareCardProps> = ({
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Border with crimson biohazard styling
-        ctx.strokeStyle = '#dc2626';
-        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 8;
         ctx.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
 
-        // Inner frame
+        // Subtle inner frame
         ctx.strokeStyle = '#27272a';
         ctx.lineWidth = 2;
         ctx.strokeRect(28, 28, canvas.width - 56, canvas.height - 56);
 
-        // Header banner
-        ctx.fillStyle = '#18181b';
-        ctx.fillRect(30, 30, canvas.width - 60, 90);
+        // Top corner brackets
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 4;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(40, 70); ctx.lineTo(40, 40); ctx.lineTo(70, 40);
+        ctx.stroke();
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - 70, 40); ctx.lineTo(canvas.width - 40, 40); ctx.lineTo(canvas.width - 40, 70);
+        ctx.stroke();
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(40, canvas.height - 70); ctx.lineTo(40, canvas.height - 40); ctx.lineTo(70, canvas.height - 40);
+        ctx.stroke();
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - 70, canvas.height - 40); ctx.lineTo(canvas.width - 40, canvas.height - 40); ctx.lineTo(canvas.width - 40, canvas.height - 70);
+        ctx.stroke();
 
-        // Header Accent line
-        ctx.fillStyle = '#e11d48';
-        ctx.fillRect(30, 118, canvas.width - 60, 4);
+        // Header Tag
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 20px monospace';
+        ctx.fillText('FORENSIC CORONER RECORD // BIOHAZARD PROTOCOL 09', 70, 80);
 
-        // Header Title
-        ctx.font = 'bold 32px "Courier New", monospace';
-        ctx.fillStyle = '#f43f5e';
-        ctx.fillText('☣ TRON WALLET AUTOPSY PROTOCOL', 60, 85);
-
-        ctx.font = 'bold 20px "Courier New", monospace';
-        ctx.fillStyle = '#a1a1aa';
-        ctx.textAlign = 'right';
-        ctx.fillText('OFFICIAL DEATH CERTIFICATE', canvas.width - 60, 85);
-        ctx.textAlign = 'left';
-
-        // Subject Address
-        ctx.font = '16px "Courier New", monospace';
-        ctx.fillStyle = '#e4e4e7';
-        ctx.fillText(`SUBJECT: ${report.address}`, 60, 160);
-
-        // Cause of Death Box
-        ctx.fillStyle = '#18181b';
-        ctx.fillRect(60, 185, canvas.width - 120, 120);
-        ctx.strokeStyle = '#dc2626';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(60, 185, canvas.width - 120, 120);
-
-        ctx.font = 'bold 15px "Courier New", monospace';
-        ctx.fillStyle = '#fb7185';
-        ctx.fillText('PRIMARY CAUSE OF FINANCIAL EXPIRATION:', 80, 215);
-
-        ctx.font = 'italic bold 24px Georgia, serif';
+        // Main Title
         ctx.fillStyle = '#ffffff';
-        // Wrap text if needed
+        ctx.font = '900 48px sans-serif';
+        ctx.fillText('TRON WALLET AUTOPSY', 70, 140);
+
+        // Wallet Address pill
+        ctx.fillStyle = '#18181b';
+        ctx.fillRect(70, 165, 420, 45);
+        ctx.strokeStyle = '#3f3f46';
+        ctx.strokeRect(70, 165, 420, 45);
+
+        ctx.fillStyle = '#e4e4e7';
+        ctx.font = '22px monospace';
+        ctx.fillText(`PATIENT: ${report.address.slice(0, 10)}...${report.address.slice(-8)}`, 90, 196);
+
+        // Scores Grid (Left Column)
+        const scoresStartY = 270;
+        const metrics = [
+          { label: '🦍 DEGEN SCORE', val: `${report.scores.degenScore}/100`, color: '#ef4444' },
+          { label: '💎 DIAMOND HANDS', val: `${report.scores.diamondHandsScore}/100`, color: '#22d3ee' },
+          { label: '🧠 FINANCIAL IQ', val: `${report.scores.financialIq}/100`, color: '#f59e0b' },
+          { label: '☠️ RUG SURVIVAL', val: `${report.scores.rugSurvivalScore}/100`, color: '#c084fc' },
+        ];
+
+        metrics.forEach((m, idx) => {
+          const y = scoresStartY + idx * 65;
+          ctx.fillStyle = '#27272a';
+          ctx.fillRect(70, y - 35, 440, 50);
+
+          ctx.fillStyle = '#a1a1aa';
+          ctx.font = 'bold 20px monospace';
+          ctx.fillText(m.label, 90, y);
+
+          ctx.fillStyle = m.color;
+          ctx.font = 'bold 26px monospace';
+          ctx.fillText(m.val, 400, y);
+        });
+
+        // Right Column: Cause of Death banner
+        ctx.fillStyle = '#18181b';
+        ctx.fillRect(550, 165, 580, 360);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(550, 165, 580, 360);
+
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 18px monospace';
+        ctx.fillText('CONFIRMED CAUSE OF DEATH:', 580, 210);
+
+        // Wrapped Cause of Death Text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'italic bold 28px sans-serif';
         const words = `"${report.causeOfDeath}"`.split(' ');
         let line = '';
-        let y = 255;
+        let lineY = 260;
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > canvas.width - 160 && n > 0) {
-            ctx.fillText(line, 80, y);
+          const metricsW = ctx.measureText(testLine);
+          if (metricsW.width > 520 && n > 0) {
+            ctx.fillText(line, 580, lineY);
             line = words[n] + ' ';
-            y += 30;
+            lineY += 40;
           } else {
             line = testLine;
           }
         }
-        ctx.fillText(line, 80, y);
+        ctx.fillText(line, 580, lineY);
 
-        // Scores Section - 4 Columns
-        const boxWidth = 245;
-        const startX = 60;
-        const boxY = 330;
-        const boxHeight = 110;
-        const gap = (canvas.width - 120 - (boxWidth * 4)) / 3;
+        // Doctor Quote / Punchline
+        ctx.fillStyle = '#71717a';
+        ctx.font = 'italic 20px sans-serif';
+        ctx.fillText(report.toxicQuote, 580, lineY + 50);
 
-        const scores = [
-          { label: 'DEGEN SCORE', val: report.scores.degenScore, color: '#f43f5e' },
-          { label: 'DIAMOND HANDS', val: report.scores.diamondHandsScore, color: '#38bdf8' },
-          { label: 'RUG SURVIVAL', val: report.scores.rugSurvivalScore, color: '#fb923c' },
-          { label: 'FINANCIAL IQ', val: report.scores.financialIq, color: '#a855f7' },
-        ];
-
-        scores.forEach((s, i) => {
-          const bx = startX + i * (boxWidth + gap);
-          ctx.fillStyle = '#18181b';
-          ctx.fillRect(bx, boxY, boxWidth, boxHeight);
-          ctx.strokeStyle = '#27272a';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(bx, boxY, boxWidth, boxHeight);
-
-          ctx.font = 'bold 13px "Courier New", monospace';
-          ctx.fillStyle = '#a1a1aa';
-          ctx.fillText(s.label, bx + 15, boxY + 30);
-
-          ctx.font = 'bold 44px "Courier New", monospace';
-          ctx.fillStyle = s.color;
-          ctx.fillText(`${s.val}`, bx + 15, boxY + 80);
-
-          ctx.font = 'bold 16px "Courier New", monospace';
-          ctx.fillStyle = '#71717a';
-          ctx.fillText('/100', bx + 85, boxY + 80);
-        });
-
-        // Autopsy Epitaph quote
-        ctx.fillStyle = '#18181b';
-        ctx.fillRect(60, 460, canvas.width - 120, 95);
-        ctx.strokeStyle = '#3f3f46';
-        ctx.strokeRect(60, 460, canvas.width - 120, 95);
-
-        ctx.font = 'bold 13px "Courier New", monospace';
-        ctx.fillStyle = '#e4e4e7';
-        ctx.fillText('PATHOLOGIST EPITAPH & FINAL DIAGNOSIS:', 80, 490);
-
-        ctx.font = '16px monospace';
-        ctx.fillStyle = '#cbd5e1';
-        const epitaphPreview = report.epitaph ? report.epitaph.slice(0, 110) + '...' : 'Liquidity departed to the cosmos. Memory eternal.';
-        ctx.fillText(epitaphPreview, 80, 525);
-
-        // Footer Bar
-        ctx.fillStyle = '#0e0e11';
-        ctx.fillRect(30, 575, canvas.width - 60, 68);
-        ctx.fillStyle = '#27272a';
-        ctx.fillRect(30, 575, canvas.width - 60, 1);
-
-        ctx.font = 'bold 16px "Courier New", monospace';
+        // DECEASED Stamp
+        ctx.save();
+        ctx.translate(980, 440);
+        ctx.rotate(-0.15);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(-100, -25, 200, 50);
         ctx.fillStyle = '#ef4444';
-        ctx.fillText(`BURN RECORD: ${burnAmountDisplay}`, 60, 615);
+        ctx.font = '900 24px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CERTIFIED REKT', 0, 10);
+        ctx.restore();
 
-        ctx.font = 'bold 18px "Courier New", monospace';
+        // Bottom bar: Burned Token info & Website CTA
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText(`🔥 BURNED: ${burnAmountDisplay}`, 70, 600);
+
         ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px monospace';
         ctx.textAlign = 'right';
-        ctx.fillText('thefootballalien.store // ROAST MY WALLET', canvas.width - 70, 615);
+        ctx.fillText('thefootballalien.store // ROAST MY WALLET', canvas.width - 70, 600);
 
         canvas.toBlob((blob) => {
-          if (blob) {
-            resolve({ blob, dataUrl: canvas.toDataURL('image/png') });
-          } else {
+          if (!blob) {
             resolve(null);
+            return;
           }
+          const dataUrl = canvas.toDataURL('image/png');
+          resolve({ blob, dataUrl });
         }, 'image/png');
       } catch (err) {
-        console.error('Error generating card image:', err);
+        console.error('Failed to generate card canvas', err);
         resolve(null);
       }
     });
   };
 
-  // 1. Download image
+  // Direct PNG download
   const handleDownloadImage = async () => {
     setIsExporting(true);
     try {
-      const generated = await generateCanvasBlob();
-      if (!generated) return;
+      const result = await generateCanvasBlob();
+      if (!result) return;
       const link = document.createElement('a');
       link.download = `tron-autopsy-${report.address.slice(0, 8)}.png`;
-      link.href = generated.dataUrl;
+      link.href = result.dataUrl;
       link.click();
-    } catch (err) {
-      console.error('Download error:', err);
     } finally {
       setIsExporting(false);
     }
   };
 
-  // 2. Copy Image directly to Clipboard (for pasting into X/Discord/Telegram)
+  // Direct clipboard copy of the image binary
   const handleCopyImageToClipboard = async () => {
     setIsExporting(true);
     try {
-      const generated = await generateCanvasBlob();
-      if (!generated) return;
+      const result = await generateCanvasBlob();
+      if (!result) return;
 
       if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([
-          new window.ClipboardItem({
-            'image/png': generated.blob,
-          }),
-        ]);
+        const item = new ClipboardItem({ 'image/png': result.blob });
+        await navigator.clipboard.write([item]);
         setIsImageCopied(true);
-        setTimeout(() => setIsImageCopied(false), 3000);
+        setTimeout(() => setIsImageCopied(false), 2500);
       } else {
-        // Fallback: download if browser doesn't support clipboard image writing
-        handleDownloadImage();
+        // Fallback: download
+        const link = document.createElement('a');
+        link.download = `tron-autopsy-${report.address.slice(0, 8)}.png`;
+        link.href = result.dataUrl;
+        link.click();
       }
     } catch (err) {
-      console.warn('Clipboard write image failed, falling back to download:', err);
+      console.warn('Image clipboard write failed, downloading instead:', err);
       handleDownloadImage();
     } finally {
       setIsExporting(false);
     }
   };
 
-  // 3. Smart Share to X:
-  // Automatically copies the forensic image to user's clipboard, triggers download backup,
-  // and opens X with pre-populated roast text ready for `Cmd+V` (paste image).
-  const handleSmartShareToX = async () => {
+  // Smart Share to X with Photo
+  const handleShareOnX = async () => {
     setIsExporting(true);
-    try {
-      const tweetContent = getTweetText(tweetVibe);
+    const tweetText = getTweetText(tweetVibe);
 
-      // Attempt to copy image to clipboard
-      const generated = await generateCanvasBlob();
-      if (generated) {
-        if (navigator.clipboard && window.ClipboardItem) {
+    try {
+      const result = await generateCanvasBlob();
+
+      // Check if native mobile Web Share API with files is supported
+      if (result && navigator.canShare) {
+        const file = new File(
+          [result.blob],
+          `tron-autopsy-${report.address.slice(0, 6)}.png`,
+          { type: 'image/png' }
+        );
+
+        if (navigator.canShare({ files: [file] })) {
           try {
-            await navigator.clipboard.write([
-              new window.ClipboardItem({
-                'image/png': generated.blob,
-              }),
-            ]);
-            setIsImageCopied(true);
-          } catch {
-            // Ignore clipboard permission reject
+            await navigator.share({
+              files: [file],
+              title: 'TRON Wallet Autopsy',
+              text: tweetText,
+            });
+            setIsExporting(false);
+            return;
+          } catch (shareErr: any) {
+            // If user closed or aborted the share sheet, exit gracefully
+            if (shareErr.name === 'AbortError') {
+              setIsExporting(false);
+              return;
+            }
+            console.warn('Web Share failed, proceeding with desktop workflow', shareErr);
           }
         }
-
-        // Also trigger download so user has it immediately in Downloads bar
-        const link = document.createElement('a');
-        link.download = `tron-autopsy-${report.address.slice(0, 8)}.png`;
-        link.href = generated.dataUrl;
-        link.click();
       }
 
-      // Show instruction helper modal
+      // Desktop / Web intent path:
+      // 1. Copy image directly to clipboard so user can instantly Ctrl+V / Cmd+V
+      if (result && navigator.clipboard && window.ClipboardItem) {
+        try {
+          const item = new ClipboardItem({ 'image/png': result.blob });
+          await navigator.clipboard.write([item]);
+          setIsImageCopied(true);
+          setTimeout(() => setIsImageCopied(false), 3000);
+        } catch (e) {
+          console.warn('Clipboard write failed:', e);
+        }
+      }
+
+      // 2. Open Twitter / X intent with viral prefilled tweet
+      const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
+
+      // 3. Show our helpful modal toast showing them how to paste the photo
       setShowHelperModal(true);
 
-      // Open Twitter Intent in new tab
-      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetContent)}`;
-      window.open(twitterUrl, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      console.error('Share to X failed:', err);
+      // 4. Also trigger background download as a safety backup
+      if (result) {
+        const link = document.createElement('a');
+        link.download = `tron-autopsy-${report.address.slice(0, 8)}.png`;
+        link.href = result.dataUrl;
+        link.click();
+      }
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Copy plain tweet text
-  const handleCopyText = async () => {
-    const text = getTweetText(tweetVibe);
-    await navigator.clipboard.writeText(text);
+  const handleCopyLink = () => {
+    const url = 'https://thefootballalien.store';
+    navigator.clipboard.writeText(url);
     setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2500);
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6">
-      {/* Vibe Selector Tabs */}
-      <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <span className="text-xs font-mono-data text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-          Choose Share Roast Vibe:
+    <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-6 space-y-6">
+      {/* Top Header & Quick Actions */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+        <div>
+          <h3 className="text-lg font-heading font-black text-white flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-rose-500" />
+            Official Autopsy Share Card
+          </h3>
+          <p className="text-xs text-zinc-400">
+            Share directly to 𝕏 with photo attached, copy the image, or download in high resolution.
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Smart Share to X with Image */}
+          <button
+            onClick={handleShareOnX}
+            disabled={isExporting}
+            className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-heading font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-rose-950/60 disabled:opacity-50 active:scale-95"
+            title="Share to X with photo attached"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>{isExporting ? 'Preparing Card...' : 'Share to 𝕏 (with Photo)'}</span>
+          </button>
+
+          {/* Copy Image Button */}
+          <button
+            onClick={handleCopyImageToClipboard}
+            disabled={isExporting}
+            className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Copy image to clipboard to paste directly (Ctrl+V / Cmd+V)"
+          >
+            {isImageCopied ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span className="text-emerald-300 font-bold">Image Copied!</span>
+              </>
+            ) : (
+              <>
+                <ImageIcon className="w-3.5 h-3.5 text-rose-400" />
+                <span>Copy Image</span>
+              </>
+            )}
+          </button>
+
+          {/* Download PNG Button */}
+          <button
+            onClick={handleDownloadImage}
+            disabled={isExporting}
+            className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Download high-res PNG file"
+          >
+            <Download className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Download</span>
+          </button>
+
+          {/* Copy Site Link */}
+          <button
+            onClick={handleCopyLink}
+            className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
+            title="Copy website link"
+          >
+            {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Tweet Vibe Selector */}
+      <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-2 bg-zinc-950/70 border border-zinc-800/80 rounded-lg text-xs font-mono-data">
+        <span className="text-zinc-400 flex items-center gap-1.5">
+          <span>Post Style:</span>
         </span>
-        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setTweetVibe('roast')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-mono-data transition-all ${
+            className={`px-2.5 py-1 rounded transition-colors ${
               tweetVibe === 'roast'
-                ? 'bg-rose-600 text-white font-bold shadow-lg shadow-rose-900/30'
-                : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold'
+                : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            🔥 Savage Roast
+            💀 Brutal Roast
           </button>
           <button
             onClick={() => setTweetVibe('degen')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-mono-data transition-all ${
+            className={`px-2.5 py-1 rounded transition-colors ${
               tweetVibe === 'degen'
-                ? 'bg-rose-600 text-white font-bold shadow-lg shadow-rose-900/30'
-                : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            🦍 Degen Scores
+            🦍 Degen Flex
           </button>
           <button
             onClick={() => setTweetVibe('arcade')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-mono-data transition-all ${
+            className={`px-2.5 py-1 rounded transition-colors ${
               tweetVibe === 'arcade'
-                ? 'bg-rose-600 text-white font-bold shadow-lg shadow-rose-900/30'
-                : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            🕹️ Arcade Cope
+            🕹️ Arcade Challenge
           </button>
         </div>
       </div>
 
-      {/* Main Forensic Share Card View */}
-      <div
-        ref={cardRef}
-        className="relative overflow-hidden rounded-2xl bg-zinc-950 border-2 border-red-700 p-6 sm:p-8 shadow-2xl morgue-glow-red font-sans"
-      >
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-600 via-rose-500 to-red-700" />
-
-        {/* Card Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 border-b border-zinc-800/80 gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-600/40 flex items-center justify-center text-red-400">
-              <Skull className="w-6 h-6 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-red-500 font-mono-data text-xs tracking-widest uppercase font-bold">
-                  DEATH CERTIFICATE #TRON-666
-                </span>
-                <span className="bg-red-900/40 text-red-400 border border-red-800/60 text-[10px] px-1.5 py-0.5 rounded uppercase font-mono-data">
-                  VERIFIED
-                </span>
-              </div>
-              <h2 className="text-2xl font-black font-heading tracking-wide text-white uppercase">
-                FORENSIC AUTOPSY
-              </h2>
-            </div>
-          </div>
-
-          <div className="text-left sm:text-right font-mono-data text-xs text-zinc-400">
-            <div>SUBJECT: <span className="text-zinc-200 font-bold">{truncatedAddress}</span></div>
-            <div className="text-[11px] text-zinc-400">
-              BURN RECORD: <span className="text-red-400 font-bold">{burnAmountDisplay}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Cause of Death Highlight */}
-        <div className="my-6 p-4 rounded-xl bg-red-950/20 border border-red-800/40">
-          <span className="text-[11px] font-mono-data text-red-400 uppercase tracking-widest block mb-1">
-            PRIMARY CAUSE OF FINANCIAL MORTALITY
-          </span>
-          <p className="text-lg sm:text-xl font-serif italic text-white font-semibold">
-            "{report.causeOfDeath}"
-          </p>
-        </div>
-
-        {/* Forensic Scores Matrix */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6 font-mono-data">
-          <div className="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 text-center">
-            <span className="text-[10px] text-zinc-400 uppercase block">DEGEN RATING</span>
-            <span className="text-2xl font-black text-rose-400">{report.scores.degenScore}</span>
-            <span className="text-[10px] text-zinc-400">/100</span>
-          </div>
-
-          <div className="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 text-center">
-            <span className="text-[10px] text-zinc-400 uppercase block">DIAMOND HANDS</span>
-            <span className="text-2xl font-black text-sky-400">{report.scores.diamondHandsScore}</span>
-            <span className="text-[10px] text-zinc-400">/100</span>
-          </div>
-
-          <div className="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 text-center">
-            <span className="text-[10px] text-zinc-400 uppercase block">RUG SURVIVAL</span>
-            <span className="text-2xl font-black text-amber-400">{report.scores.rugSurvivalScore}</span>
-            <span className="text-[10px] text-zinc-400">/100</span>
-          </div>
-
-          <div className="p-3 rounded-lg bg-zinc-900/80 border border-zinc-800 text-center">
-            <span className="text-[10px] text-zinc-400 uppercase block">FINANCIAL IQ</span>
-            <span className="text-2xl font-black text-purple-400">{report.scores.financialIq}</span>
-            <span className="text-[10px] text-zinc-400">/100</span>
-          </div>
-        </div>
-
-        {/* Pathologist Epitaph */}
-        <div className="border-t border-zinc-800/80 pt-4 text-xs font-mono-data text-zinc-300">
-          <span className="text-zinc-400 uppercase tracking-wider block mb-1">
-            PATHOLOGIST'S FINAL DIAGNOSIS:
-          </span>
-          <p className="line-clamp-2 italic text-zinc-300">
-            {report.epitaph || 'Wallet suffered irreversible liquidation. May liquidity rest in peace.'}
-          </p>
-        </div>
-
-        {/* Card Footer Branding */}
-        <div className="mt-6 pt-3 border-t border-zinc-800 flex items-center justify-between text-[11px] font-mono-data text-zinc-400">
-          <div className="flex items-center gap-2">
-            <Flame className="w-3.5 h-3.5 text-red-500" />
-            <span>thefootballalien.store</span>
-          </div>
-          <span>OFFICIAL COMMUNITY AUTOPSY</span>
-        </div>
-      </div>
-
-      {/* Action Buttons Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Main Viral X Button */}
-        <button
-          onClick={handleSmartShareToX}
-          disabled={isExporting}
-          className="col-span-1 sm:col-span-1 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-600 text-white font-heading font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-red-900/30 active:scale-95 transition-all disabled:opacity-50"
-        >
-          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-          </svg>
-          <span>Share to 𝕏 (with Image)</span>
-        </button>
-
-        {/* Copy Image directly to clipboard */}
-        <button
-          onClick={handleCopyImageToClipboard}
-          disabled={isExporting}
-          className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 font-mono-data text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
-        >
-          {isImageCopied ? (
-            <>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span className="text-emerald-400">Image Copied!</span>
-            </>
-          ) : (
-            <>
-              <ImageIcon className="w-4 h-4 text-cyan-400" />
-              <span>Copy Image (Cmd+C)</span>
-            </>
-          )}
-        </button>
-
-        {/* Download High Res Image */}
-        <button
-          onClick={handleDownloadImage}
-          disabled={isExporting}
-          className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 font-mono-data text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
-        >
-          <Download className="w-4 h-4 text-amber-400" />
-          <span>{isExporting ? 'Generating...' : 'Download Card'}</span>
-        </button>
-      </div>
-
-      {/* Copy Text Option */}
-      <div className="flex items-center justify-between px-2 text-xs font-mono-data text-zinc-400">
-        <span>Need just the text?</span>
-        <button
-          onClick={handleCopyText}
-          className="text-rose-400 hover:text-rose-300 underline flex items-center gap-1"
-        >
-          {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-          <span>{isCopied ? 'Text copied!' : 'Copy roast text only'}</span>
-        </button>
-      </div>
-
-      {/* Helper Modal Popup When User clicks "Share to X" */}
+      {/* Helper Modal / Toast for Desktop Paste */}
       {showHelperModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border-2 border-red-600 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-fade-in font-mono-data text-left">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-2 text-red-500 font-bold text-sm uppercase">
-                <Skull className="w-4 h-4" />
-                <span>Ready to Share on 𝕏</span>
-              </div>
-              <button
-                onClick={() => setShowHelperModal(false)}
-                className="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-zinc-900"
-              >
-                ✕ Close
-              </button>
+        <div className="p-4 bg-gradient-to-r from-rose-950/80 via-zinc-900 to-amber-950/80 border-2 border-rose-500/70 rounded-xl space-y-3 animate-fade-in shadow-xl">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 text-rose-400 font-heading font-black text-sm uppercase">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <span>Card Image Copied to Clipboard & 𝕏 Composer Opened!</span>
             </div>
-
-            <div className="space-y-3 text-xs text-zinc-300">
-              <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-lg flex items-center gap-2 text-emerald-300">
-                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                <span>
-                  <strong>Image Copied & Downloaded!</strong> Your forensic autopsy certificate is ready.
-                </span>
-              </div>
-
-              <p className="text-zinc-400">
-                In your new <strong>𝕏 tab</strong>:
-              </p>
-
-              <ol className="list-decimal list-inside space-y-2 pl-1 text-zinc-200">
-                <li>
-                  Your roast tweet text has already been typed for you.
-                </li>
-                <li>
-                  Press <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 text-amber-300">Cmd + V</kbd> (or <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 text-amber-300">Ctrl + V</kbd>) inside the tweet box to paste the image card!
-                </li>
-                <li>
-                  <em>(Or click the image icon in 𝕏 and select the image downloaded to your Downloads folder).</em>
-                </li>
-              </ol>
-            </div>
-
             <button
               onClick={() => setShowHelperModal(false)}
-              className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-colors"
+              className="text-zinc-400 hover:text-white text-xs px-2 py-1 bg-zinc-800 rounded cursor-pointer"
             >
-              Got it, let's post!
+              ✕ Close
+            </button>
+          </div>
+
+          <div className="text-xs text-zinc-300 space-y-1.5 font-mono-data">
+            <p className="flex items-center gap-1.5 text-zinc-200">
+              <span className="text-emerald-400 font-bold">1.</span>
+              <span>We opened your 𝕏 (Twitter) tab with the pre-written viral post.</span>
+            </p>
+            <p className="flex items-center gap-1.5 text-amber-300 font-bold">
+              <span>2.</span>
+              <span>Simply press <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-white">Ctrl + V</kbd> (or <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-white">⌘ + V</kbd>) in the 𝕏 composer to attach the photo!</span>
+            </p>
+            <p className="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+              <span>3.</span>
+              <span>We also saved a backup PNG to your downloads folder just in case.</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleCopyImageToClipboard}
+              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs text-white rounded font-medium flex items-center gap-1.5"
+            >
+              <Copy className="w-3.5 h-3.5 text-rose-400" />
+              <span>Re-copy Image</span>
+            </button>
+            <button
+              onClick={handleDownloadImage}
+              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs text-white rounded font-medium flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Download PNG Again</span>
             </button>
           </div>
         </div>
       )}
+
+      {/* The Visual Share Card (Pixel-Perfect Forensic Morgue Design) */}
+      <div
+        ref={cardRef}
+        className="w-full max-w-2xl mx-auto bg-zinc-950 border-2 border-rose-600/80 rounded-xl p-6 sm:p-8 relative overflow-hidden shadow-2xl font-mono-data morgue-glow-red"
+      >
+        {/* Top Coroner Header */}
+        <div className="flex items-center justify-between border-b border-rose-900/60 pb-3 mb-4">
+          <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-widest">
+            <Skull className="w-4 h-4" />
+            <span>🪦 WALLET AUTOPSY</span>
+          </div>
+          <span className="text-[11px] text-zinc-400">TRON FORENSIC UNIT</span>
+        </div>
+
+        {/* Truncated Address */}
+        <div className="bg-zinc-900/90 border border-zinc-800 px-3 py-1.5 rounded inline-block text-xs font-mono-data text-zinc-300 mb-5">
+          WALLET: <span className="text-rose-400 font-bold">{truncatedAddress}</span>
+        </div>
+
+        {/* Diagnostic Scores Box */}
+        <div className="grid grid-cols-2 gap-2 text-xs mb-5">
+          <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 flex items-center justify-between">
+            <span className="text-zinc-400">🦍 DEGEN SCORE</span>
+            <span className="text-rose-400 font-bold text-sm">{report.scores.degenScore}</span>
+          </div>
+
+          <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 flex items-center justify-between">
+            <span className="text-zinc-400">💎 DIAMOND HANDS</span>
+            <span className="text-cyan-400 font-bold text-sm">{report.scores.diamondHandsScore}</span>
+          </div>
+
+          <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 flex items-center justify-between">
+            <span className="text-zinc-400">🧠 FINANCIAL IQ</span>
+            <span className="text-amber-400 font-bold text-sm">{report.scores.financialIq}</span>
+          </div>
+
+          <div className="bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 flex items-center justify-between">
+            <span className="text-zinc-400">☠️ RUG SURVIVAL</span>
+            <span className="text-purple-400 font-bold text-sm">{report.scores.rugSurvivalScore}</span>
+          </div>
+        </div>
+
+        {/* Cause of Death in Card */}
+        <div className="border-t border-b border-rose-900/40 py-3.5 my-4">
+          <span className="text-[11px] uppercase tracking-wider text-rose-500 font-bold block mb-1">
+            CAUSE OF DEATH:
+          </span>
+          <p className="text-base sm:text-lg font-heading font-bold text-white italic">
+            "{report.causeOfDeath}"
+          </p>
+        </div>
+
+        {/* Proof of Burn & Call to Action */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs pt-2">
+          <span className="text-rose-400 font-bold flex items-center gap-1.5">
+            <Flame className="w-4 h-4 text-amber-400" />
+            BURNED: {burnAmountDisplay}
+          </span>
+          <span className="text-zinc-300 font-sans font-semibold text-xs flex items-center gap-1">
+            <span>thefootballalien.store</span>
+            <ExternalLink className="w-3 h-3 text-zinc-500" />
+          </span>
+        </div>
+
+        {/* Coroner Stamp Overlay */}
+        <div className="absolute right-6 bottom-14 hidden sm:block">
+          <div className="coroner-stamp text-[10px] opacity-80">
+            AUTOPSY CONFIRMED
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

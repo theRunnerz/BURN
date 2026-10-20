@@ -102,7 +102,7 @@ export const DeathOracle: React.FC<DeathOracleProps> = ({
       `💀 Predicted Date of Death: ${prophecy.predictedDateOfDeath}\n` +
       `⚰️ Manner: "${prophecy.mannerOfDeath.slice(0, 100)}..."\n` +
       `👻 Haunting Ghost: ${prophecy.hauntingSpirit}\n\n` +
-      `Consult the Death Oracle at tronwalletautopsy.com #HalloweenCrypto #TRON`;
+      `Consult the Death Oracle at thefootballalien.store #HalloweenCrypto #TRON`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 

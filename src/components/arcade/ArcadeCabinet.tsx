@@ -1,324 +1,445 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Gamepad2, 
-  Coins, 
-  Trophy, 
-  Volume2, 
-  VolumeX, 
-  Flame, 
-  Share2, 
-  Sparkles,
-  Info
-} from 'lucide-react';
-import { ArcadeScore, ArcadeConfig } from '../../types';
-import { fetchArcadeConfig, depositArcadeQuarter, fetchArcadeScores } from '../../services/api';
-import { TronManGame } from './TronManGame';
-import { X1RoidGame } from './X1RoidGame';
-import { FootballAlienGame } from './FootballAlienGame';
+import React, { useEffect, useState, useCallback } from 'react';
+import { TronManGame } from './TronManGame.js';
+import { X1roidGame } from './X1roidGame.js';
+import { FootballAlienGame } from './FootballAlienGame.js';
+import { soundFX } from '../../utils/audio.js';
+import { depositArcadeQuarter, fetchArcadeScores, submitArcadeScore } from '../../services/api.js';
+import { sendTrxTransaction } from '../../services/tronWallet.js';
+import { ArcadeScore } from '../../types.js';
+import { Coins, Trophy, Sparkles, AlertCircle, Copy, Check, ExternalLink, Gamepad2, Volume2, VolumeX, MessageSquare, Share2 } from 'lucide-react';
 
 interface ArcadeCabinetProps {
   walletAddress: string | null;
-  onConnectWallet: () => void;
-  defaultGame?: 'tron-man' | 'x1-roid' | 'football-alien';
+  onOpenChat: () => void;
+  fbaBalance?: number;
+  initialGame?: 'tron-man' | 'x1-roid' | 'football-alien';
+  onConnectWallet?: () => void;
 }
+
+const ARCADE_REVENUE_ADDRESS = 'TENXRknaJG3acTjdm9pLzLrPHahZLgHygP';
+const COIN_PRICE_TRX = 0.25;
 
 export const ArcadeCabinet: React.FC<ArcadeCabinetProps> = ({
   walletAddress,
+  onOpenChat,
+  fbaBalance = 0,
+  initialGame = 'tron-man',
   onConnectWallet,
-  defaultGame = 'tron-man'
 }) => {
-  const [selectedGame, setSelectedGame] = useState<'tron-man' | 'x1-roid' | 'football-alien'>(defaultGame);
-  const [credits, setCredits] = useState<number>(3); // 3 demo credits default
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [arcadeConfig, setArcadeConfig] = useState<ArcadeConfig | null>(null);
-  const [scores, setScores] = useState<ArcadeScore[]>([]);
-  const [lastGameScore, setLastGameScore] = useState<number | null>(null);
+  const [activeGame, setActiveGame] = useState<'tron-man' | 'x1-roid' | 'football-alien'>(initialGame);
+  const [credits, setCredits] = useState<number>(1); // Start with 1 complimentary demo credit!
   const [isDepositing, setIsDepositing] = useState(false);
-  const [depositMsg, setDepositMsg] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [depositStatus, setDepositStatus] = useState<string | null>(null);
+  const [depositError, setDepositError] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [scores, setScores] = useState<ArcadeScore[]>([]);
+  const [isSubmittingScore, setIsSubmittingScore] = useState(false);
+  const [lastFinishedScore, setLastFinishedScore] = useState<number | null>(null);
+  const [playerName, setPlayerName] = useState(
+    walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : 'DegenPlayer'
+  );
+  const [isMuted, setIsMuted] = useState(false);
 
+  // Load scores on mount
   useEffect(() => {
-    fetchArcadeConfig().then(setArcadeConfig).catch(console.error);
-    fetchArcadeScores().then(res => setScores(res.scores)).catch(console.error);
+    fetchArcadeScores()
+      .then(res => setScores(res.scores))
+      .catch(err => console.warn('Scores load notice:', err));
   }, []);
 
-  const handleInsertCoin = async (isDemo: boolean = false) => {
+  const handleCopyRevenueAddress = () => {
+    navigator.clipboard.writeText(ARCADE_REVENUE_ADDRESS);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+  };
+
+  // Deposit 0.25 TRX via TronLink
+  const handleTronLinkDeposit = async () => {
+    setIsDepositing(true);
+    setDepositError(null);
+    setDepositStatus('Requesting TronLink 0.25 TRX coin transfer...');
+
     try {
-      setIsDepositing(true);
-      setDepositMsg(null);
-      const res = await depositArcadeQuarter({
-        walletAddress: walletAddress || undefined,
-        game: selectedGame,
-        isDemo
-      });
-      setCredits(prev => prev + res.credits);
-      setDepositMsg(isDemo ? '🎟️ Demo quarter accepted! 1 credit added.' : '🪙 20 TRX deposited! 3 credits added to machine.');
-      setTimeout(() => setDepositMsg(null), 4000);
+      const res = await sendTrxTransaction(ARCADE_REVENUE_ADDRESS, COIN_PRICE_TRX);
+      if (res.success) {
+        soundFX.playCoinSound();
+        setCredits(prev => prev + 1);
+        setDepositStatus('0.25 TRX confirmed on ledger! 1 Arcade credit added.');
+
+        // Notify server
+        await depositArcadeQuarter({
+          walletAddress: walletAddress || undefined,
+          game: activeGame,
+          txHash: res.txHash,
+          isDemo: false,
+        });
+
+        setTimeout(() => setDepositStatus(null), 3500);
+      }
     } catch (err: any) {
-      setDepositMsg(err.message || 'Deposit failed');
+      if (err.isUserDeclined) {
+        setDepositError('Coin deposit was cancelled in wallet.');
+      } else {
+        setDepositError(err.message || 'Deposit failed. You can use the Free Test Quarter below.');
+      }
     } finally {
       setIsDepositing(false);
     }
   };
 
-  const handleStartGame = () => {
-    if (credits <= 0) return;
-    setCredits(prev => prev - 1);
-    setIsPlaying(true);
+  // Instant demo coin drop
+  const handleDemoQuarterDeposit = async () => {
+    soundFX.playCoinSound();
+    setCredits(prev => prev + 1);
+    setDepositStatus('🪙 Test Quarter dropped! +1 Game Credit');
+    setDepositError(null);
+
+    try {
+      await depositArcadeQuarter({
+        walletAddress: walletAddress || undefined,
+        game: activeGame,
+        isDemo: true,
+      });
+    } catch (err) {
+      // ignore
+    }
+
+    setTimeout(() => setDepositStatus(null), 2500);
   };
 
-  const handleGameOver = async (finalScore: number) => {
-    setIsPlaying(false);
-    setLastGameScore(finalScore);
-    const res = await fetchArcadeScores();
-    setScores(res.scores);
+  const handleGameOver = useCallback((finalScore: number) => {
+    setLastFinishedScore(finalScore);
+  }, []);
+
+  const handleSubmitScore = async () => {
+    if (lastFinishedScore === null) return;
+    setIsSubmittingScore(true);
+    try {
+      const res = await submitArcadeScore({
+        game: activeGame,
+        player: playerName,
+        walletAddress: walletAddress || undefined,
+        score: lastFinishedScore,
+      });
+      if (res.scores) {
+        setScores(res.scores);
+      }
+      setLastFinishedScore(null);
+    } catch (err: any) {
+      console.error('Score submit error:', err);
+    } finally {
+      setIsSubmittingScore(false);
+    }
   };
 
-  const shareScoreOnX = (scoreVal: number) => {
-    const text = `Just hit a score of ${scoreVal.toLocaleString()} in the ${
-      selectedGame === 'football-alien' ? 'Football Alien$ Galactic Bowl' : (selectedGame === 'tron-man' ? 'TRON-MAN' : 'X1-ROID')
-    } retro arcade cabinet on the TRON SunPump Cemetery! 🕹️💀\n\nBurn dead tokens & play:`;
-    const url = window.location.href;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+  const handleShareArcadeScore = () => {
+    if (lastFinishedScore === null) return;
+    const gameName = activeGame === 'football-alien'
+      ? 'Alien Blitz: Galactic Bowl 👽🏈'
+      : activeGame === 'tron-man'
+      ? 'Tron Man (Pac-Man) 🕹️'
+      : 'X1roid (Asteroids) 🚀';
+
+    const tweetText = activeGame === 'football-alien'
+      ? `Just scored ${lastFinishedScore.toLocaleString()} pts in Alien Blitz ($FBA Token-Gated Bowl)!\n\n` +
+        `Alien QB firing plasma spirals & crushing interstellar linebackers.\n\n` +
+        `Hold 1,000 $FBA & play live at thefootballalien.store #FootballAlien #FBA #TRON #SunPump`
+      : `Just scored ${lastFinishedScore.toLocaleString()} pts on ${gameName} at the TRON Rekt Arcade!\n\n` +
+        `Dropped 0.25 TRX into the machine. Think you can beat my high score?\n\n` +
+        `Play live at thefootballalien.store #TRON #TRX #TheFootballAlien #RetroArcade`;
+
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank', 'noopener,noreferrer');
   };
+
+  const currentLeaderboard = scores
+    .filter(s => s.game === activeGame)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Arcade Header Marquee */}
-      <div className="relative overflow-hidden rounded-3xl border border-purple-500/40 bg-gradient-to-r from-purple-950/70 via-black to-zinc-950 p-6 md:p-8 shadow-2xl shadow-purple-950/30">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 animate-pulse" />
+    <div className="space-y-8 animate-fade-in">
+      {/* Top Arcade Marquee Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-zinc-950 via-cyan-950/40 to-zinc-950 border border-cyan-800/60 p-6 shadow-2xl morgue-glow-cyan">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/40 bg-purple-500/10 text-purple-300 text-xs font-mono">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" /> RETRO TRON ARCADE
+          <div className="text-center md:text-left space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-400 text-xs font-mono-data">
+              <Gamepad2 className="w-3.5 h-3.5 animate-pulse" />
+              <span>RETRO COIN-OP REVENUE MACHINE</span>
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
-              <span>CYBER</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400">
-                QUARTER
+            <h2 className="text-3xl sm:text-4xl font-black font-heading tracking-wider text-white uppercase flex items-center justify-center md:justify-start gap-3">
+              <span>TRON REKT ARCADE</span>
+              <span className="text-sm px-2.5 py-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 font-mono-data">
+                0.25 TRX / PLAY
               </span>
-              <span>CABINET</span>
-            </h1>
-            <p className="text-sm font-mono text-zinc-400">
-              Drop 20 TRX to play classic on-chain style arcade titles. 100% of proceeds fund the $ASHES funeral furnace & FBA buybacks.
+            </h2>
+            <p className="text-sm text-zinc-300 max-w-xl">
+              Burn excess energy and conquer the high scores. All 0.25 TRX arcade deposits go directly to our community revenue address.
             </p>
           </div>
 
-          {/* Credits Counter & Insert Coin Box */}
-          <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-zinc-900/90 border border-purple-500/30 w-full md:w-auto min-w-[260px]">
-            <div className="flex items-center justify-between w-full text-xs font-mono">
-              <span className="text-zinc-400">CREDITS REMAINING:</span>
-              <span className="text-2xl font-black text-amber-400 font-mono tracking-wider">{credits}</span>
-            </div>
-
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={() => handleInsertCoin(false)}
-                disabled={isDepositing}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-bold font-mono text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-all"
-              >
-                <Coins className="w-4 h-4" />
-                INSERT 20 TRX
-              </button>
-              <button
-                onClick={() => handleInsertCoin(true)}
-                disabled={isDepositing}
-                className="px-3 py-2.5 rounded-xl border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-mono text-xs disabled:opacity-50"
-                title="Free demo coin for practice"
-              >
-                DEMO
-              </button>
-            </div>
-
-            {depositMsg && (
-              <div className="text-[11px] font-mono text-emerald-400 text-center animate-fade-in">
-                {depositMsg}
+          {/* Credits Display & Coin Door */}
+          <div className="bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-4 flex flex-col items-center gap-3 min-w-[240px] shadow-lg">
+            <div className="text-center">
+              <span className="text-[10px] font-mono-data text-zinc-400 uppercase tracking-widest block">
+                MACHINE CREDITS
+              </span>
+              <div className="text-3xl font-black font-mono-data text-yellow-400 tracking-wider">
+                {credits > 0 ? (
+                  `${credits} CREDIT${credits === 1 ? '' : 'S'}`
+                ) : (
+                  <span className="text-rose-500 animate-pulse text-xl">INSERT COIN</span>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Game Selection Marquee Tabs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Game 1: Football Alien */}
-        <button
-          onClick={() => { setSelectedGame('football-alien'); setIsPlaying(false); }}
-          className={`p-5 rounded-2xl border text-left transition-all ${
-            selectedGame === 'football-alien'
-              ? 'border-emerald-500 bg-emerald-950/40 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/50'
-              : 'border-zinc-800 bg-zinc-950/70 hover:border-emerald-500/40'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-2xl">👽🏈</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
-              FEATURED
-            </span>
-          </div>
-          <div className="font-bold text-white text-base">Alien Blitz: Galactic Bowl</div>
-          <div className="text-xs text-zinc-400 font-mono mt-1">
-            Shoot plasma footballs, dodge cyborg linebackers & score 100-yard touchdowns!
-          </div>
-        </button>
-
-        {/* Game 2: Tron-Man */}
-        <button
-          onClick={() => { setSelectedGame('tron-man'); setIsPlaying(false); }}
-          className={`p-5 rounded-2xl border text-left transition-all ${
-            selectedGame === 'tron-man'
-              ? 'border-cyan-500 bg-cyan-950/40 shadow-lg shadow-cyan-950/40 ring-1 ring-cyan-500/50'
-              : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-700'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-2xl">🕹️🟡</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold">
-              PAC-STYLE
-            </span>
-          </div>
-          <div className="font-bold text-white text-base">Tron-Man Neon Maze</div>
-          <div className="text-xs text-zinc-400 font-mono mt-1">
-            Eat energy wafers, dodge red candle ghosts, and grab the Justin Sun mega pellet!
-          </div>
-        </button>
-
-        {/* Game 3: X1-Roid */}
-        <button
-          onClick={() => { setSelectedGame('x1-roid'); setIsPlaying(false); }}
-          className={`p-5 rounded-2xl border text-left transition-all ${
-            selectedGame === 'x1-roid'
-              ? 'border-purple-500 bg-purple-950/40 shadow-lg shadow-purple-950/40 ring-1 ring-purple-500/50'
-              : 'border-zinc-800 bg-zinc-950/70 hover:border-zinc-700'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-2xl">🚀🪨</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold">
-              ASTEROIDS
-            </span>
-          </div>
-          <div className="font-bold text-white text-base">X1-Roid Debris Blaster</div>
-          <div className="text-xs text-zinc-400 font-mono mt-1">
-            Blast flying rugpull boulders and honeypot debris with high-frequency photon lasers!
-          </div>
-        </button>
-      </div>
-
-      {/* Main Cabinet Frame */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Screen and Play Controls */}
-        <div className="lg:col-span-8 flex flex-col items-center">
-          <div className="w-full rounded-3xl border-4 border-zinc-800 bg-zinc-950 p-4 md:p-6 shadow-2xl relative">
-            <div className="absolute top-2 left-6 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              CRT RASTER MATRIX 60HZ
             </div>
 
-            {/* Game Screen Canvas */}
-            <div className="w-full flex justify-center py-2">
-              {selectedGame === 'football-alien' ? (
-                <FootballAlienGame
-                  onGameOver={handleGameOver}
-                  walletAddress={walletAddress || undefined}
-                  isTokenHolder={true}
-                />
-              ) : selectedGame === 'tron-man' ? (
-                <TronManGame
-                  isPlaying={isPlaying}
-                  onGameOver={handleGameOver}
-                  walletAddress={walletAddress || undefined}
-                  onStartGame={handleStartGame}
-                  credits={credits}
-                />
-              ) : (
-                <X1RoidGame
-                  isPlaying={isPlaying}
-                  onGameOver={handleGameOver}
-                  walletAddress={walletAddress || undefined}
-                  onStartGame={handleStartGame}
-                  credits={credits}
-                />
-              )}
-            </div>
+            <div className="flex items-center gap-2 w-full">
+              <button
+                onClick={handleTronLinkDeposit}
+                disabled={isDepositing}
+                className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50"
+              >
+                <Coins className="w-3.5 h-3.5" />
+                <span>{isDepositing ? 'Signing...' : 'Drop 0.25 TRX'}</span>
+              </button>
 
-            {/* Cabinet Controls Bar */}
-            <div className="mt-4 pt-4 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500 shadow-md shadow-red-500/50" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500 shadow-md shadow-yellow-500/50" />
-                <span className="w-3 h-3 rounded-full bg-green-500 shadow-md shadow-green-500/50" />
-                <span className="text-xs font-mono text-zinc-500 ml-2">HI-DEF CONTROLS READY</span>
-              </div>
-
-              {lastGameScore !== null && (
-                <button
-                  onClick={() => shareScoreOnX(lastGameScore)}
-                  className="px-4 py-2 rounded-xl bg-[#1DA1F2]/20 hover:bg-[#1DA1F2]/30 border border-[#1DA1F2]/40 text-[#1DA1F2] text-xs font-mono flex items-center gap-1.5 transition-all"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  Brag Score on X
-                </button>
-              )}
+              <button
+                onClick={handleDemoQuarterDeposit}
+                className="py-2 px-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono-data flex items-center justify-center gap-1 border border-zinc-700"
+                title="Insert complimentary test quarter"
+              >
+                <span>Free Coin</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Right Column: High Scores Leaderboard & Rules */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* High Scores Card */}
-          <div className="p-6 rounded-3xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-2 text-amber-400 font-mono text-sm font-bold">
+        {/* Community Revenue Destination Notice */}
+        <div className="mt-4 pt-3 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono-data text-zinc-400">
+          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+            <span className="text-zinc-400">Arcade Revenue Vault:</span>
+            <code className="text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
+              {ARCADE_REVENUE_ADDRESS}
+            </code>
+            <button
+              onClick={handleCopyRevenueAddress}
+              className="text-zinc-400 hover:text-white p-1"
+              title="Copy revenue address"
+            >
+              {copiedAddress ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+            <a
+              href={`https://tronscan.org/#/address/${ARCADE_REVENUE_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cyan-400 hover:underline flex items-center gap-1"
+            >
+              <span>TronScan</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          <button
+            onClick={onOpenChat}
+            className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 underline font-mono-data"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Join Degen Chat Room</span>
+          </button>
+        </div>
+
+        {/* Deposit Messages */}
+        {depositStatus && (
+          <div className="mt-3 p-2 bg-emerald-950/70 border border-emerald-700/60 rounded text-xs text-emerald-300 font-mono-data text-center animate-fade-in">
+            {depositStatus}
+          </div>
+        )}
+        {depositError && (
+          <div className="mt-3 p-2 bg-rose-950/70 border border-rose-800/60 rounded text-xs text-rose-300 font-mono-data text-center animate-fade-in">
+            {depositError}
+          </div>
+        )}
+      </div>
+
+      {/* Game Selector Tabs */}
+      <div className="flex items-center justify-between flex-wrap gap-4 border-b border-zinc-800 pb-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setActiveGame('football-alien')}
+            className={`px-4 py-2 rounded-lg font-heading font-black text-xs uppercase tracking-wider flex items-center gap-2 transition-all ${
+              activeGame === 'football-alien'
+                ? 'bg-gradient-to-r from-emerald-500 to-lime-400 text-black shadow-lg shadow-emerald-500/30'
+                : 'bg-zinc-900 text-emerald-400 hover:text-emerald-200 border border-emerald-800/60'
+            }`}
+          >
+            <span className="text-base">👽🏈</span>
+            <span>ALIEN BLITZ (Galactic Bowl)</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-lime-300 font-mono-data border border-emerald-700">1000 $FBA</span>
+          </button>
+
+          <button
+            onClick={() => setActiveGame('tron-man')}
+            className={`px-4 py-2 rounded-lg font-heading font-black text-xs uppercase tracking-wider flex items-center gap-2 transition-all ${
+              activeGame === 'tron-man'
+                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+            }`}
+          >
+            <span className="text-base">🕹️</span>
+            <span>TRON MAN (Pac-Man)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveGame('x1-roid')}
+            className={`px-4 py-2 rounded-lg font-heading font-black text-xs uppercase tracking-wider flex items-center gap-2 transition-all ${
+              activeGame === 'x1-roid'
+                ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+                : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+            }`}
+          >
+            <span className="text-base">🚀</span>
+            <span>X1ROID (Asteroids)</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setIsMuted(!isMuted);
+              soundFX.isMuted = !isMuted;
+            }}
+            className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono-data text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5"
+          >
+            {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
+            <span>{isMuted ? 'Muted' : 'Retro Audio'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Game Screen & High Scores Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Left 3 cols: Arcade Game Canvas */}
+        <div className="lg:col-span-3 flex justify-center bg-zinc-950/60 p-4 sm:p-6 rounded-2xl border border-zinc-800/80 backdrop-blur-sm shadow-xl">
+          {activeGame === 'football-alien' ? (
+            <FootballAlienGame
+              fbaBalance={fbaBalance}
+              onGameOver={handleGameOver}
+              walletAddress={walletAddress}
+              onConnectWallet={onConnectWallet}
+            />
+          ) : activeGame === 'tron-man' ? (
+            <TronManGame
+              credits={credits}
+              onUseCredit={() => setCredits(c => Math.max(0, c - 1))}
+              onInsertCoinPrompt={handleTronLinkDeposit}
+              onGameOver={handleGameOver}
+              walletAddress={walletAddress}
+            />
+          ) : (
+            <X1roidGame
+              credits={credits}
+              onUseCredit={() => setCredits(c => Math.max(0, c - 1))}
+              onInsertCoinPrompt={handleTronLinkDeposit}
+              onGameOver={handleGameOver}
+              walletAddress={walletAddress}
+            />
+          )}
+        </div>
+
+        {/* Right 1 col: Cabinet Side Panel & High Scores */}
+        <div className="space-y-6">
+          {/* Submit High Score Box if Game Over with points */}
+          {lastFinishedScore !== null && lastFinishedScore > 0 && (
+            <div className="p-4 bg-yellow-950/40 border border-yellow-700/60 rounded-xl space-y-3 animate-fade-in">
+              <div className="flex items-center gap-2 text-yellow-400 text-xs font-mono-data font-bold">
                 <Trophy className="w-4 h-4" />
-                <span>TOP PLAYERS</span>
+                <span>SUBMIT YOUR SCORE</span>
               </div>
-              <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                {selectedGame.toUpperCase()}
-              </span>
+              <p className="text-xs text-zinc-300 font-mono-data">
+                You earned <strong className="text-yellow-400 text-sm">{lastFinishedScore.toLocaleString()}</strong> pts!
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  maxLength={16}
+                  value={playerName}
+                  onChange={e => setPlayerName(e.target.value)}
+                  placeholder="Enter arcade callsign"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs font-mono-data text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSubmitScore}
+                    disabled={isSubmittingScore}
+                    className="flex-1 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs uppercase tracking-wider rounded font-mono-data disabled:opacity-50 transition-colors"
+                  >
+                    {isSubmittingScore ? 'Posting...' : 'Post to Leaderboard'}
+                  </button>
+                  <button
+                    onClick={handleShareArcadeScore}
+                    className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold text-xs uppercase tracking-wider rounded font-mono-data transition-colors flex items-center gap-1.5"
+                    title="Share high score on X"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-yellow-400" />
+                    <span>Share 𝕏</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* High Scores Leaderboard */}
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-heading font-black tracking-wider uppercase">
+                <Trophy className="w-4 h-4" />
+                <span>
+                  {activeGame === 'football-alien'
+                    ? 'Alien Blitz Bowl'
+                    : activeGame === 'tron-man'
+                    ? 'Tron Man'
+                    : 'X1roid'} Hall of Fame
+                </span>
+              </div>
+              <span className="text-[10px] text-zinc-400 font-mono-data">TOP 5</span>
             </div>
 
-            <div className="space-y-2">
-              {scores
-                .filter(s => s.game === selectedGame)
-                .slice(0, 7)
-                .map((sc, i) => (
+            <div className="space-y-2.5">
+              {currentLeaderboard.length > 0 ? (
+                currentLeaderboard.map((item, idx) => (
                   <div
-                    key={sc.id || i}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 font-mono text-xs"
+                    key={item.id}
+                    className="flex items-center justify-between text-xs font-mono-data p-2 rounded bg-zinc-900/60 border border-zinc-800/60"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className={`w-5 font-bold ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-zinc-300' : i === 2 ? 'text-amber-600' : 'text-zinc-500'}`}>
-                        #{i + 1}
+                    <div className="flex items-center gap-2">
+                      <span className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
+                        idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' :
+                        idx === 1 ? 'bg-zinc-700/40 text-zinc-300' :
+                        idx === 2 ? 'bg-amber-900/30 text-amber-600' : 'text-zinc-400'
+                      }`}>
+                        #{idx + 1}
                       </span>
-                      <span className="text-white font-semibold truncate max-w-[110px]">{sc.player}</span>
+                      <span className="text-zinc-200 font-medium truncate max-w-[90px]">{item.player}</span>
                     </div>
-                    <span className="text-amber-400 font-bold">{sc.score.toLocaleString()}</span>
+                    <span className="text-amber-400 font-bold">{item.score.toLocaleString()}</span>
                   </div>
-                ))}
-
-              {scores.filter(s => s.game === selectedGame).length === 0 && (
-                <div className="text-xs font-mono text-zinc-500 py-6 text-center">
-                  No records logged yet. Be the first high scorer!
-                </div>
+                ))
+              ) : (
+                <p className="text-xs text-zinc-400 font-mono-data text-center py-4">No high scores registered yet.</p>
               )}
             </div>
           </div>
 
-          {/* Revenue & Burn Transparency Box */}
-          <div className="p-5 rounded-2xl border border-orange-500/20 bg-orange-950/10 font-mono text-xs space-y-3">
-            <div className="flex items-center gap-2 text-orange-400 font-bold">
-              <Flame className="w-4 h-4" />
-              <span>ARCADE REVENUE BURN POLICY</span>
-            </div>
-            <p className="text-zinc-400 leading-relaxed text-[11px]">
-              Every 20 TRX deposited goes into the verified incinerator smart contract to buy back dead tokens and fund the prize pool.
-            </p>
-            <div className="pt-2 border-t border-orange-500/20 flex justify-between items-center text-[10px] text-zinc-500">
-              <span>Smart Contract:</span>
-              <span className="text-orange-400 truncate max-w-[140px]">
-                {arcadeConfig?.revenueAddress || 'TNW5ABkp3v4jfeDo1vRVjxa3gtnoxP3DBN'}
-              </span>
-            </div>
+          {/* Machine Specs & Instructions */}
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-xs font-mono-data space-y-2.5 text-zinc-300">
+            <span className="text-[10px] uppercase text-zinc-400 font-bold block tracking-wider">
+              ARCADE MECHANICS
+            </span>
+            <ul className="space-y-1.5 text-[11px] text-zinc-400 list-disc list-inside">
+              <li>Each 0.25 TRX payment grants 1 Game Credit.</li>
+              <li>Revenues support TRON Wallet Autopsy infrastructure.</li>
+              <li>Keyboard: Arrow keys / WASD / Spacebar.</li>
+              <li>Touch & mobile buttons enabled beneath the canvas.</li>
+            </ul>
           </div>
         </div>
       </div>
