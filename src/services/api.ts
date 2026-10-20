@@ -1,85 +1,90 @@
-import { ArcadeConfig, ArcadeScore, AutopsyReport, ChainConfig, ChatMessage, DeathOracleResult, LeaderboardEntry, WalletData } from '../types.js';
+import { 
+  AutopsyReport, 
+  BurnCertificate, 
+  DeathOracleResult, 
+  HallOfDeadItem, 
+  BurnLeaderboardEntry,
+  CommunityMemorial,
+  ArcadeScore,
+  ArcadeConfig,
+  ChatMessage
+} from '../types';
 
-export async function fetchChainConfig(): Promise<{ activeChain: string; config: ChainConfig; availableChains: Array<{ id: string; name: string; active: boolean }> }> {
-  const res = await fetch('/api/config');
-  if (!res.ok) throw new Error('Failed to fetch chain configuration');
-  return res.json();
-}
-
-export async function updateChainConfig(chainId?: string, partialConfig?: Partial<ChainConfig>): Promise<{ success: boolean; config: ChainConfig; activeChain: string }> {
-  const res = await fetch('/api/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chainId, partialConfig }),
-  });
-  if (!res.ok) throw new Error('Failed to update chain config');
-  return res.json();
-}
-
-export async function fetchWalletData(address: string): Promise<WalletData> {
-  const res = await fetch(`/api/wallet/${encodeURIComponent(address)}`);
+export async function fetchAutopsyReport(address: string): Promise<AutopsyReport> {
+  const res = await fetch(`/api/autopsy?address=${encodeURIComponent(address)}`);
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `Failed to fetch wallet info for ${address}`);
+    const err = await res.json().catch(() => ({ error: 'Autopsy failed' }));
+    throw new Error(err.error || 'Autopsy failed to complete');
   }
   return res.json();
 }
 
-export async function analyzeWallet(address: string): Promise<{ autopsyId: string; report: AutopsyReport; activeChainConfig: ChainConfig }> {
-  const res = await fetch('/api/autopsy/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address }),
-  });
+export async function fetchLiveTokens(address: string): Promise<{ tokens: any[]; trxBalance: number }> {
+  const res = await fetch(`/api/tokens?address=${encodeURIComponent(address)}`);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Failed to examine wallet');
+    return { tokens: [], trxBalance: 0 };
   }
   return res.json();
 }
 
-export async function verifyBurnTransaction(
-  autopsyId: string,
-  txHash: string,
-  senderAddress?: string,
-  burnAmount = 0.25,
-  burnTokenSymbol = 'TRX'
-): Promise<{ success: boolean; report: AutopsyReport; burnDetails: any }> {
-  const res = await fetch('/api/autopsy/verify-burn', {
+export async function burnDeadToken(params: {
+  tokenAddress: string;
+  tokenSymbol: string;
+  amount: number;
+  walletAddress: string;
+  epitaph?: string;
+  sinRepented?: string;
+}): Promise<BurnCertificate> {
+  const res = await fetch('/api/burn', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ autopsyId, txHash, senderAddress, burnAmount, burnTokenSymbol }),
+    body: JSON.stringify(params),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Transaction verification rejected');
+    const err = await res.json().catch(() => ({ error: 'Burn incantation failed' }));
+    throw new Error(err.error || 'Failed to burn token');
   }
   return res.json();
 }
 
-export async function fetchLeaderboard(): Promise<{ leaderboard: LeaderboardEntry[] }> {
+export async function fetchHallOfDead(): Promise<{ items: HallOfDeadItem[]; totalBurntCount: number; totalLostUsd: number }> {
+  const res = await fetch('/api/hall-of-dead');
+  if (!res.ok) throw new Error('Failed to fetch hall of the dead');
+  return res.json();
+}
+
+export async function fetchLeaderboard(): Promise<{ leaderboard: BurnLeaderboardEntry[] }> {
   const res = await fetch('/api/leaderboard');
   if (!res.ok) throw new Error('Failed to fetch leaderboard');
   return res.json();
 }
 
-export async function createFuneralEulogy(deadTokens: string[], burialType: string, address: string): Promise<{ eulogy: string }> {
-  const res = await fetch('/api/funeral', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ deadTokens, burialType, address }),
-  });
-  if (!res.ok) throw new Error('Failed to generate funeral eulogy');
+export async function fetchMemorials(): Promise<{ memorials: CommunityMemorial[] }> {
+  const res = await fetch('/api/memorials');
+  if (!res.ok) throw new Error('Failed to fetch memorials');
   return res.json();
 }
 
-export async function createWalletHoroscope(address: string, zodiacSign: string, degenScore: number): Promise<{ horoscope: string }> {
-  const res = await fetch('/api/horoscope', {
+export async function lightCandle(id: string): Promise<{ success: boolean; candles: number }> {
+  const res = await fetch(`/api/memorials/${encodeURIComponent(id)}/candle`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to light candle');
+  return res.json();
+}
+
+export async function createMemorial(data: {
+  tokenSymbol: string;
+  tokenName: string;
+  rugYear: number;
+  deathCause: string;
+  eulogy: string;
+  creator: string;
+}): Promise<CommunityMemorial> {
+  const res = await fetch('/api/memorials', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address, zodiacSign, degenScore }),
+    body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed to generate horoscope');
+  if (!res.ok) throw new Error('Failed to record memorial');
   return res.json();
 }
 
@@ -102,7 +107,7 @@ export async function fetchArcadeConfig(): Promise<ArcadeConfig> {
 
 export async function depositArcadeQuarter(params: {
   walletAddress?: string;
-  game: 'tron-man' | 'x1-roid';
+  game: 'tron-man' | 'x1-roid' | 'football-alien';
   txHash?: string;
   isDemo?: boolean;
 }): Promise<{ success: boolean; credits: number; revenueAddress: string }> {
@@ -119,6 +124,7 @@ export async function fetchArcadeScores(): Promise<{
   scores: ArcadeScore[];
   tronManScores: ArcadeScore[];
   x1RoidScores: ArcadeScore[];
+  footballAlienScores?: ArcadeScore[];
 }> {
   const res = await fetch('/api/arcade/scores');
   if (!res.ok) throw new Error('Failed to fetch arcade scores');
@@ -126,7 +132,7 @@ export async function fetchArcadeScores(): Promise<{
 }
 
 export async function submitArcadeScore(params: {
-  game: 'tron-man' | 'x1-roid';
+  game: 'tron-man' | 'x1-roid' | 'football-alien';
   player: string;
   walletAddress?: string;
   score: number;
@@ -143,22 +149,25 @@ export async function submitArcadeScore(params: {
 // Chat API client
 export async function fetchChatMessages(): Promise<{ messages: ChatMessage[] }> {
   const res = await fetch('/api/chat');
-  if (!res.ok) throw new Error('Failed to fetch chat messages');
+  if (!res.ok) throw new Error('Failed to fetch cemetery chat');
   return res.json();
 }
 
-export async function sendChatMessage(params: {
-  text: string;
-  sender?: string;
-  walletAddress?: string;
-  badge?: 'DEGEN' | 'WHALE' | 'CHAMPION' | 'CORONER';
-  autopsyCard?: { degenScore: number; causeOfDeath: string };
-}): Promise<{ success: boolean; message: ChatMessage; messages: ChatMessage[] }> {
+export async function postChatMessage(params: {
+  player: string;
+  walletAddress: string;
+  message: string;
+  avatarSeed?: string;
+  rankBadge?: string;
+}): Promise<{ success: boolean; message: ChatMessage }> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   });
-  if (!res.ok) throw new Error('Failed to send message');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to broadcast shout' }));
+    throw new Error(err.error || 'Failed to send message');
+  }
   return res.json();
 }
