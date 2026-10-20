@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ExternalLink, Rocket, ShieldCheck, Flame, Trophy, Coins, Gamepad2, Sparkles, Check, Copy, RefreshCw, Search } from 'lucide-react';
+import { FbaBalanceChart } from './FbaBalanceChart.js';
 
 interface FootballAlienPortalProps {
   onPlayExclusiveGame: () => void;
@@ -264,6 +265,13 @@ export const FootballAlienPortal: React.FC<FootballAlienPortalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Recharts FBA Balance Trends Visualization */}
+      <FbaBalanceChart
+        walletAddress={walletAddress}
+        currentBalance={fbaBalance}
+        onRefreshBalance={handleRefresh}
+      />
 
       {/* Feature Pillar Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
